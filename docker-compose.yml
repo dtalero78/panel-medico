@@ -1,0 +1,30 @@
+version: '3.8'
+
+# Configuración para desarrollo local con Docker
+# En producción (Digital Ocean), se usa el mismo Dockerfile
+# pero con configuración optimizada de costos (un solo servicio)
+
+services:
+  # Servicio unificado: Backend + Frontend
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_API_KEY_SID=${TWILIO_API_KEY_SID}
+      - TWILIO_API_KEY_SECRET=${TWILIO_API_KEY_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
+      - ALLOWED_ORIGINS=http://localhost:3000
+    restart: unless-stopped
+    networks:
+      - bsl-network
+
+networks:
+  bsl-network:
+    driver: bridge

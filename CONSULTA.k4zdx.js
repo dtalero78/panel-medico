@@ -1,0 +1,357 @@
+import wixData from 'wix-data';
+import wixStorage from 'wix-storage';
+import wixWindow from 'wix-window';
+import { sendTextMessage } from 'backend/WHATSAPP';
+import { makeVoiceCall } from 'backend/TWILIO';
+
+let documento = wixStorage.local.getItem("documentoParaLightbox");
+let codEmpresa = wixStorage.local.getItem("codEmpresaParaLightbox");
+
+// ==================================================
+// CONFIGURACION DE VIDEOLLAMADAS
+// ==================================================
+const VIDEO_APP_DOMAIN = 'https://bsl-consultavideo-58jne.ondigitalocean.app';
+
+/**
+ * Genera un nombre único para la sala de video
+ */
+function generarNombreSala() {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 7);
+    return `consulta-${timestamp}-${random}`;
+}
+
+/**
+ * Construye el link de videollamada para el paciente
+ */
+function construirLinkVideollamada(roomName, nombre, apellido, codMedico) {
+    const params = new URLSearchParams({
+        nombre: nombre.trim(),
+        apellido: apellido.trim(),
+        doctor: codMedico.trim()
+    });
+    return `${VIDEO_APP_DOMAIN}/patient/${roomName}?${params.toString()}`;
+}
+
+/**
+ * Construye el link de videollamada para el doctor
+ */
+function construirLinkDoctor(roomName, codMedico) {
+    return `${VIDEO_APP_DOMAIN}/doctor/${roomName}?doctor=${encodeURIComponent(codMedico.trim())}`;
+}
+
+async function fetchHistoriaClinica(documento) {
+    try {
+        let results = await wixData.query("HistoriaClinica").eq("numeroId", documento).find();
+        if (results.items.length === 0) throw "No se encontró un registro en HistoriaClinica con ese documento.";
+
+        let item = results.items[0];
+        populateHistoriaClinicaFields(item);
+        const telefonoConPrefijo = formatTelefono(item.celular);
+
+        // Botón WhatsApp simple (#whp)
+        const mensaje = `Hola ${item.nombre}. Te escribimos de BSL. Tienes una cita médica programada conmigo`;
+        const enlaceWhatsApp = `https://api.whatsapp.com/send?phone=${telefonoConPrefijo}&text=${encodeURIComponent(mensaje)}`;
+
+        $w('#whp').link = enlaceWhatsApp;
+        $w('#whp').target = "_blank";
+
+        // Botón para hacer solo la llamada (#segundaLlamada)
+        $w('#segundaLlamada').onClick(async () => {
+            // Mostrar estado
+            $w('#estadoSegundaLlamada').text = "📞 REALIZANDO LLAMADA...";
+            $w('#estadoSegundaLlamada').show();
+
+            try {
+                // Hacer la llamada con el teléfono que incluye el prefijo +
+                const resultadoLlamada = await makeVoiceCall(telefonoConPrefijo, item.primerNombre);
+
+                if (resultadoLlamada.success) {
+                    console.log("Segunda llamada iniciada exitosamente");
+                    $w('#estadoSegundaLlamada').text = "✅ LLAMADA REALIZADA";
+                } else {
+                    console.error("Error en la segunda llamada:", resultadoLlamada.error);
+                    $w('#estadoSegundaLlamada').text = "❌ LLAMADA FALLÓ";
+                }
+            } catch (errorLlamada) {
+                console.error("Error realizando segunda llamada:", errorLlamada);
+                $w('#estadoSegundaLlamada').text = "❌ LLAMADA FALLÓ";
+            }
+        });
+
+        // Botón WhatsApp con videollamada (#whpTwilio)
+        $w('#whpTwilio').onClick(async () => {
+            // Generar sala SOLO cuando se hace clic
+            const roomName = generarNombreSala();
+            const linkVideollamadaPaciente = construirLinkVideollamada(
+                roomName,
+                item.primerNombre,
+                item.primerApellido,
+                codEmpresa
+            );
+            const linkVideollamadaDoctor = construirLinkDoctor(roomName, codEmpresa);
+
+            const mensajeVideollamada = `Hola ${item.primerNombre}. Te escribimos de BSL.
+
+Para tu consulta médica, haz clic en el siguiente link:
+
+${linkVideollamadaPaciente}
+
+El link te conectará automáticamente con el Dr. ${codEmpresa}.
+
+Asegúrate de permitir el acceso a tu cámara y micrófono cuando el navegador te lo pida.
+
+¡Que tengas una excelente consulta!`;
+
+            // Guardar el link del doctor
+            wixStorage.local.setItem("linkVideollamadaDoctor", linkVideollamadaDoctor);
+            wixStorage.local.setItem("roomNameActual", roomName);
+
+            // Configurar el botón iniciarConsultaTwilio INMEDIATAMENTE con el link correcto
+            $w('#iniciarConsultaTwilio').link = linkVideollamadaDoctor;
+            $w('#iniciarConsultaTwilio').target = "_blank";
+
+            // Formatear teléfono para sendTextMessage (sin el prefijo +)
+            const telefonoSinPrefijo = telefonoConPrefijo.substring(1);
+
+            // Mostrar estado de envío
+            $w('#estadoWhp').text = "📤 ENVIANDO LINK...";
+            $w('#estadoWhp').show();
+
+            // Enviar mensaje de WhatsApp usando la API de backend
+            try {
+                await sendTextMessage(telefonoSinPrefijo, mensajeVideollamada);
+                console.log("Mensaje de videollamada enviado exitosamente");
+
+                // Actualizar el campo de texto para indicar que el mensaje fue enviado
+                $w('#estadoWhp').text = "✅ MENSAJE ENVIADO";
+            } catch (error) {
+                console.error("Error enviando mensaje de videollamada:", error);
+
+                // Mostrar error en el campo de texto
+                $w('#estadoWhp').text = "❌ ERROR AL ENVIAR";
+            }
+
+            // 📞 Realizar llamada de voz después de enviar el mensaje de WhatsApp
+            try {
+                $w('#estadoWhp').text = "📞 REALIZANDO LLAMADA...";
+
+                // Hacer la llamada con el teléfono que incluye el prefijo +
+                const resultadoLlamada = await makeVoiceCall(telefonoConPrefijo, item.primerNombre);
+
+                if (resultadoLlamada.success) {
+                    console.log("Llamada de voz iniciada exitosamente");
+                    $w('#estadoWhp').text = "✅ MENSAJE ENVIADO Y LLAMADA REALIZADA";
+                } else {
+                    console.error("Error en la llamada:", resultadoLlamada.error);
+                    $w('#estadoWhp').text = "⚠️ MENSAJE ENVIADO, LLAMADA FALLÓ";
+                }
+            } catch (errorLlamada) {
+                console.error("Error realizando llamada de voz:", errorLlamada);
+                $w('#estadoWhp').text = "⚠️ MENSAJE ENVIADO, LLAMADA FALLÓ";
+            }
+        });
+
+        return item;
+    } catch (error) {
+        console.error("Error en la consulta de HistoriaClinica:", error);
+        throw error;
+    }
+}
+
+async function fetchFormulario(documento) {
+    try {
+        let results = await wixData.query("FORMULARIO").eq("documentoIdentidad", documento).find();
+        if (results.items.length === 0) throw "No se encontró un registro en FORMULARIO con ese documento.";
+
+        let item = results.items[0];
+        populateFormularioFields(item);
+
+        return item;
+    } catch (error) {
+        console.error("Error en la consulta de FORMULARIO:", error);
+        throw error;
+    }
+}
+
+function populateHistoriaClinicaFields(item) {
+    $w('#nombres').text = `${item.primerNombre || ""} ${item.primerApellido || ""}`;
+    $w('#numeroId').text = item.numeroId || "";
+    $w('#empresa').text = item.empresa || "";
+    $w('#tipoExamen').text = item.tipoExamen || "";
+    $w('#fechaConsulta').text = item.fechaAtencion ? item.fechaAtencion.toLocaleString() : "";
+    $w('#examenes').text = item.examenes ? item.examenes.toString() : "";
+    $w('#mdAntecedentes').value = item.mdAntecedentes || "";
+    $w('#mdObsparaMidocya').value = item.mdObsParaMiDocYa || "";
+    $w('#mdObservacionesCertificado').value = item.mdObservacionesCertificado || "";
+    $w('#mdRecomendacionesMedicasAdicionales').value = item.mdRecomendacionesMedicasAdicionales || "";
+    $w('#cargo').text = item.cargo || "";
+    $w('#concepto').value = item.mdConceptoFinal || "";
+    $w('#celular').text = item.celular || "No Registrado";
+}
+
+function populateFormularioFields(item) {
+    $w('#profesion').text = item.profesion || "No especificado";
+    $w('#foto').src = item.foto || "";
+    $w('#edad').text = item.edad || "No especificado";
+    $w('#genero').text = item.genero || "No especificado";
+    $w('#licor').text = item.licor || "No especificado";
+    $w('#ciudadDeResidencia').text = item.ciudadDeResidencia || "No especificado";
+    $w('#estadoCivil').text = item.estadoCivil || "No especificado";
+    $w('#hijos').text = item.hijos || "No especificado";
+    $w('#ejercicio').text = item.ejercicio || "No especificado";
+    $w('#encuesta').text = item.encuestaSalud ? item.encuestaSalud.toString() : "No especificado";
+    $w('#historiaFamiliar').text = item.antecedentesFamiliares ? item.antecedentesFamiliares.toString() : "No especificado";
+    $w('#cargoAnterior').text = item.empresa1 || "No especificado";
+}
+
+/**
+ * Formatea un número de teléfono para WhatsApp (con prefijo +)
+ * Soporta formatos internacionales: +52, +1, +57, etc.
+ * Ejemplos:
+ *   "(+52) 2441564651" -> "+522441564651"
+ *   "+13053392098" -> "+13053392098"
+ *   "13053455190" -> "+13053455190"
+ *   "3001234567" -> "+573001234567" (Colombia por defecto)
+ */
+function formatTelefono(telefono) {
+    // Remover todos los espacios, paréntesis y guiones
+    telefono = telefono.replace(/[\s\(\)\-]/g, '');
+
+    // Si ya tiene el +, retornar tal cual
+    if (telefono.startsWith('+')) {
+        return telefono;
+    }
+
+    // Si empieza con un código de país conocido (sin +), agregar el +
+    // Códigos de país comunes: 1 (USA/Canada), 52 (México), 57 (Colombia), etc.
+    const countryCodes = ['1', '52', '57', '54', '55', '34', '44', '49', '33'];
+
+    for (let code of countryCodes) {
+        if (telefono.startsWith(code)) {
+            return `+${telefono}`;
+        }
+    }
+
+    // Si no tiene código de país, asumir Colombia (+57) por defecto
+    return `+57${telefono}`;
+}
+
+async function modificarHistoriaClinica() {
+    // 🔹 Deshabilitar el botón mientras se procesa
+    $w('#modificar').disable();
+    $w('#loadingModificar').show();
+
+    const today = new Date();
+
+    try {
+        let results = await wixData.query("HistoriaClinica").eq("numeroId", documento).find();
+        if (results.items.length === 0) throw "No se encontró un registro con ese documento.";
+
+        let item = results.items[0];
+        updateHistoriaClinicaFields(item, today);
+
+        let updatedItem = await wixData.update("HistoriaClinica", item);
+
+        // 🟨 Enviar mensaje solo si es SITEL o KM2
+        if (updatedItem.codEmpresa === "SITEL" || updatedItem.codEmpresa === "KM2") {
+            await handleSITELorKM2Case(updatedItem);
+        }
+
+        // 🟨 Llamar a la app externa para generar el PDF si es RIPPLING
+        if (updatedItem.codEmpresa === "RIPPLING") {
+            $w('#modificar').label = "ESPERA! NO CIERRES LA VENTANA";
+
+            const documentoId = updatedItem.numeroId;
+            const nombreArchivo = `${updatedItem.primerNombre} ${updatedItem.primerApellido} ${updatedItem.numeroId}`;
+
+            try {
+                const res = await fetch("https://bsl-utilidades-yp78a.ondigitalocean.app/generar-pdf", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        documento: documentoId,
+                        nombreArchivo,
+                        codEmpresa: updatedItem.codEmpresa,
+                        tipoExamen: updatedItem.tipoExamen
+                    })
+                });
+
+                const data = await res.json();
+                console.log("✅ PDF generado y subido:", data);
+            } catch (err) {
+                console.error("❌ Error generando PDF:", err);
+            } finally {
+                $w('#modificar').label = "Guardar";
+            }
+        }
+
+        wixWindow.lightbox.close();
+    } catch (error) {
+        console.error("Error actualizando el registro:", error);
+    } finally {
+        // 🔹 Siempre reactivar el botón al final
+        $w('#loadingModificar').hide();
+        $w('#modificar').enable();
+    }
+}
+
+
+function updateHistoriaClinicaFields(item, date) {
+    item.mdAntecedentes = $w('#mdAntecedentes').value;
+    item.mdObsParaMiDocYa = $w('#mdObsparaMidocya').value;
+    item.mdObservacionesCertificado = $w('#mdObservacionesCertificado').value;
+    item.mdRecomendacionesMedicasAdicionales = $w('#mdRecomendacionesMedicasAdicionales').value;
+    item.cargo = $w('#cargo').text;
+    item.mdConceptoFinal = $w('#concepto').value;
+    item.mdDx1 = $w('#dx1').value;
+    item.mdDx2 = $w('#dx2').value;
+    item.fechaConsulta = date;
+    item.atendido = "ATENDIDO";
+    item.talla = $w('#talla').value;
+    item.peso = $w('#peso').value;
+}
+
+async function handleSITELorKM2Case(item) {
+    let results = await wixData.query("ADCTEST").eq("documento", item.numeroId).find();
+    if (results.items.length > 0) return;
+
+    const telefonoConPrefijo = formatTelefono(item.celular).substring(1);
+    const phonePattern = /^57\d{10}$/;
+    if (!phonePattern.test(telefonoConPrefijo)) throw 'Número de teléfono no válido';
+
+    let empresaNombre;
+    if (item.codEmpresa === "SITEL") {
+        empresaNombre = "FOUNDEVER";
+    } else if (item.codEmpresa === "KM2") {
+        empresaNombre = "KM2";
+    } else if (item.codEmpresa === "SIIGO") {
+        empresaNombre = "SIIGO";
+    } else {
+        throw "Empresa no reconocida";
+    }
+
+    await sendTextMessage(
+        telefonoConPrefijo,
+        `Hola! Estás realizando el examen médico de ${empresaNombre} con nosotros. Debes terminar el siguiente link *urgente*: \n\nhttp://www.bsl.com.co/historia-clinica/${item.numeroId}`
+    );
+}
+
+$w.onReady(async function () {
+    try {
+        await fetchHistoriaClinica(documento);
+        await fetchFormulario(documento);
+    } catch (error) {
+        console.error("Error al obtener los datos:", error);
+    }
+
+    $w("#modificar").onClick(modificarHistoriaClinica);
+
+    // Configurar el campo iniciarConsultaTwilio para abrir la sala del doctor
+    const linkVideollamadaDoctor = wixStorage.local.getItem("linkVideollamadaDoctor");
+
+    if (linkVideollamadaDoctor) {
+        $w('#iniciarConsultaTwilio').link = linkVideollamadaDoctor;
+        $w('#iniciarConsultaTwilio').target = "_blank";
+    }
+});
