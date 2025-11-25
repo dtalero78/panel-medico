@@ -3,6 +3,7 @@ import { DoctorPage } from './pages/DoctorPage';
 import { DoctorRoomPage } from './pages/DoctorRoomPage';
 import { PatientPage } from './pages/PatientPage';
 import { MedicalPanelPage } from './pages/MedicalPanelPage';
+import { PresencialConsultaPage } from './pages/PresencialConsultaPage';
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
         <Route path="/doctor/:roomName" element={<DoctorRoomPage />} />
         <Route path="/patient/:roomName" element={<PatientPage />} />
         <Route path="/panel-medico" element={<MedicalPanelPage />} />
+        <Route path="/presencial/:consultaId" element={<PresencialConsultaPage />} />
       </Routes>
     </BrowserRouter>
   );

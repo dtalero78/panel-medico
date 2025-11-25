@@ -30,7 +30,16 @@ interface Patient {
   medico?: string;
   motivoConsulta?: string;
   tipoExamen?: string;
+  tipoConsulta?: 'virtual' | 'presencial';
 }
+
+/**
+ * Determina si una consulta es presencial basándose en el código del médico
+ * Las consultas presenciales tienen la palabra "PRESENCIAL" en el campo medico
+ */
+const isPresencialConsulta = (medicoCode: string): boolean => {
+  return medicoCode.toUpperCase().includes('PRESENCIAL');
+};
 
 interface PaginatedPatients {
   patients: Patient[];
@@ -45,7 +54,6 @@ interface PatientDetails extends Patient {
   ciudad?: string;
   fechaNacimiento?: Date;
   genero?: string;
-  tipoConsulta?: string;
   fechaConsulta?: Date;
   diagnostico?: string;
   tratamiento?: string;
@@ -108,7 +116,17 @@ class MedicalPanelService {
         }
       });
 
-      return response.data;
+      // Agregar tipoConsulta a cada paciente basándose en el código del médico
+      const tipoConsulta = isPresencialConsulta(medicoCode) ? 'presencial' : 'virtual';
+      const patientsWithType = response.data.patients.map((patient: Patient) => ({
+        ...patient,
+        tipoConsulta
+      }));
+
+      return {
+        ...response.data,
+        patients: patientsWithType
+      };
     } catch (error) {
       console.error('Error obteniendo pacientes pendientes de Wix:', error);
 

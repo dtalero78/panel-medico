@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BSL Consulta Video is a Twilio-based video calling application integrated with Wix for medical consultations. It features a React frontend, Node.js/Express backend, and WhatsApp reporting via WHAPI.
+BSL Consulta Video is a telemedicine platform with Twilio video calling, real-time postural analysis (MediaPipe), and a medical panel for patient management. It features a React frontend, Node.js/Express backend with Socket.io, PostgreSQL database, OpenAI integration for medical recommendations, and WhatsApp messaging via WHAPI.
 
 ## Development Commands
 
@@ -57,6 +57,26 @@ npm run build
 **Why this matters**: In development, frontend runs on :5173 and backend on :3000 (requires CORS). In production, both are served from :3000 (no CORS needed). The `VITE_API_BASE_URL` env var controls this:
 - Development: `VITE_API_BASE_URL=http://localhost:3000`
 - Production: `VITE_API_BASE_URL=""` (empty = relative URLs)
+
+### Socket.io WebSocket Architecture
+
+**Telemedicine namespace** (`/telemedicine`): Handles real-time postural analysis streaming between patient and doctor.
+
+**Key events**:
+- `create-analysis-session` - Doctor starts a postural analysis session
+- `join-analysis-session` - Patient joins an active session
+- `pose-data` - Patient sends MediaPipe pose landmarks (33 points)
+- `pose-data-update` - Server relays pose data to doctor
+- `session-ended` / `patient-disconnected` - Cleanup events
+
+**Session lifecycle**:
+1. Patient enters room → Auto-joins telemedicine namespace
+2. Doctor clicks "Start Postural Analysis" → Creates session
+3. Patient's camera activates, MediaPipe loads (~5-7 seconds)
+4. Patient streams pose data at 15 FPS to doctor
+5. Doctor sees real-time skeleton overlay with medical metrics
+
+**Important**: Sessions are stored in-memory and cleaned up after 24 hours of inactivity.
 
 ### Wix Integration Pattern
 
@@ -169,22 +189,36 @@ Twilio tracks must be attached to DOM elements in specific useEffect patterns. S
 ## Key Files and Their Roles
 
 ### Backend
-- `src/index.ts` - Express app setup, serves both API and static frontend
+- `src/index.ts` - Express app setup, Socket.io initialization, serves API and static frontend
 - `src/services/twilio.service.ts` - Token generation, room management
 - `src/services/session-tracker.service.ts` - Session lifecycle tracking, WhatsApp reporting
+- `src/services/telemedicine-socket.service.ts` - Real-time postural analysis via Socket.io
+- `src/services/postgres.service.ts` - PostgreSQL connection pool and queries
+- `src/services/openai.service.ts` - AI-powered medical recommendations
+- `src/services/medical-panel.service.ts` - Patient management (stats, lists, search)
 - `src/controllers/video.controller.ts` - Video API endpoints
-- `src/routes/video.routes.ts` - API route definitions
+- `src/controllers/medical-panel.controller.ts` - Medical panel endpoints
+- `src/routes/video.routes.ts` - `/api/video/*` routes
+- `src/routes/medical-panel.routes.ts` - `/api/medical-panel/*` routes
+- `src/routes/telemedicine.routes.ts` - `/api/telemedicine/*` routes
 
 ### Frontend
 - `src/hooks/useVideoRoom.ts` - Core Twilio Video integration logic (connect, disconnect, tracks)
 - `src/hooks/useBackgroundEffects.ts` - Manages blur and virtual background processors
-- `src/components/VideoRoom.tsx` - Main video UI (grid layout, controls)
+- `src/hooks/usePosturalAnalysis.ts` - Socket.io connection for real-time pose streaming
+- `src/components/VideoRoom.tsx` - Main video UI (grid layout, controls, postural analysis modal)
 - `src/components/VideoControls.tsx` - Bottom control bar (mic, camera, backgrounds, hang up)
 - `src/components/BackgroundControls.tsx` - Dropdown menu for background effects
 - `src/components/Participant.tsx` - Individual participant video/audio rendering
+- `src/components/PosturalAnalysisModal.tsx` - Doctor's view of patient skeleton with metrics
+- `src/components/PosturalAnalysisPatient.tsx` - Patient's camera + MediaPipe pose detection
+- `src/components/PosturalAnalysisCanvas.tsx` - Draws skeleton from 33 landmarks
 - `src/pages/DoctorRoomPage.tsx` - Doctor joins pre-generated room from Wix
 - `src/pages/PatientPage.tsx` - Patient joins from WhatsApp link with pre-filled info
+- `src/pages/MedicalPanelPage.tsx` - Standalone doctor panel for patient management
 - `src/services/api.service.ts` - Axios client for backend API calls
+- `src/services/medical-panel.service.ts` - Medical panel API client
+- `src/utils/mediapipe-loader.ts` - Dynamic MediaPipe model loading
 - `public/twilio-processors/` - TFLite models and WASM for background effects (DO NOT DELETE)
 
 ### Wix Integration
@@ -202,8 +236,17 @@ TWILIO_API_KEY_SID=SKxxxxxx
 TWILIO_API_KEY_SECRET=xxxxxx
 
 # WhatsApp API (WHAPI) - Required for session reports and Wix integration
-# Get your token from https://whapi.cloud/
 WHAPI_TOKEN=xxxxxx
+
+# PostgreSQL (Digital Ocean managed database)
+POSTGRES_HOST=your-db.ondigitalocean.com
+POSTGRES_PORT=25060
+POSTGRES_USER=doadmin
+POSTGRES_PASSWORD=xxxxxx
+POSTGRES_DATABASE=defaultdb
+
+# OpenAI (for medical recommendations)
+OPENAI_API_KEY=sk-xxxxxx
 
 # Server config
 PORT=3000
@@ -219,7 +262,8 @@ VITE_API_BASE_URL=http://localhost:3000  # Development only
 
 ## URL Patterns
 
-- `/` - Home page (patient or doctor flow selection)
+- `/` - Redirects to `/panel-medico`
+- `/panel-medico` - Standalone medical panel (patient management, stats)
 - `/patient/:roomName?nombre=X&apellido=Y&doctor=Z` - Patient joins room (pre-filled from Wix)
 - `/doctor/:roomName?doctor=CODE` - Doctor joins specific room from Wix panel
 - `/doctor` - Manual doctor room creation page
@@ -245,7 +289,8 @@ Deployment is fully automated via `.do/app.yaml` configuration.
 1. Add method to appropriate service (`backend/src/services/`)
 2. Add controller method (`backend/src/controllers/`)
 3. Register route (`backend/src/routes/`)
-4. Add API client method (`frontend/src/services/api.service.ts`)
+4. Register router in `backend/src/index.ts` (e.g., `app.use('/api/new-feature', newRoutes)`)
+5. Add API client method (`frontend/src/services/api.service.ts`)
 
 ### Room name generation
 Always use the pattern: `consulta-${timestamp36}-${random5}` (see `generarNombreSala()` in Wix files)
@@ -279,6 +324,12 @@ Main repeater in `wix.json` displays:
 - `whpTwilio.onClick`: Generates room, sends WhatsApp link, configures doctor button
 - `iniciarConsultaTwilio`: Opens doctor video room (link set dynamically in whpTwilio.onClick)
 
+### Medical Panel API Endpoints
+- `GET /api/medical-panel/stats/:medicoCode` - Daily stats (scheduled, attended, remaining)
+- `GET /api/medical-panel/patients/pending/:medicoCode?page=0&pageSize=10` - Paginated pending patients
+- `GET /api/medical-panel/patients/search/:documento?medicoCode=X` - Search patient by ID
+- `PATCH /api/medical-panel/patients/:patientId/no-answer` - Mark patient as "No Contesta"
+
 ## Testing Notes
 
 - Backend has Jest configured but tests not yet implemented
@@ -301,3 +352,14 @@ Main repeater in `wix.json` displays:
 - **Issue**: International numbers not recognized
 - **Solution**: Use `formatTelefono()` which supports multiple country codes
 - **Remember**: Remove `+` prefix when using `sendTextMessage()` API
+
+### Postural Analysis Not Working
+- **Symptom**: Doctor sees "Loading..." but skeleton never appears
+- **Check console logs**: Look for `[Doctor] 📊 Received pose data` and `[Canvas] 🎨 Attempting to draw`
+- **Common causes**: Socket.io not connected before starting, patient camera blocked, MediaPipe model failed to load
+- **Debug**: See `DIAGNOSTICO_ANALISIS_POSTURAL.md` for detailed troubleshooting guide
+
+### MediaPipe Model Loading
+- **Issue**: Pose detection fails or takes too long
+- **Note**: First load takes ~5-7 seconds (downloads ~2-3 MB TFLite model)
+- **Patient requirements**: Good lighting, visible upper body, camera permissions granted

@@ -21,6 +21,7 @@ export interface Patient {
   empresaListado: string;
   pvEstado?: string;
   tipoExamen?: string;
+  tipoConsulta?: 'virtual' | 'presencial';
 }
 
 export interface PaginatedPatients {
@@ -38,7 +39,6 @@ export interface PatientDetails extends Patient {
   ciudad?: string;
   fechaNacimiento?: Date;
   genero?: string;
-  tipoConsulta?: string;
   motivoConsulta?: string;
   fechaConsulta?: Date;
 }

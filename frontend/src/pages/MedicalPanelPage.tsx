@@ -339,19 +339,27 @@ export function MedicalPanelPage() {
   const handleAtender = async (patient: Patient) => {
     setAttendingPatient(patient._id);
     try {
-      // Usar la sala guardada si existe (si ya se contactó al paciente)
-      // Si no existe, generar una nueva sala
-      let roomName = patientRooms[patient._id];
-      if (!roomName) {
-        roomName = medicalPanelService.generateRoomName();
-        setPatientRooms(prev => ({ ...prev, [patient._id]: roomName }));
+      // Determinar si es consulta presencial o virtual
+      const isPresencial = patient.tipoConsulta === 'presencial';
+
+      if (isPresencial) {
+        // Para consultas presenciales: ir a la página de consulta presencial (sin video)
+        const presencialUrl = `${window.location.origin}/presencial/${patient._id}?doctor=${medicoCode}&documento=${patient._id}&paciente=${encodeURIComponent(patient.nombres)}`;
+        window.open(presencialUrl, '_blank');
+      } else {
+        // Para consultas virtuales: usar la sala guardada o generar una nueva
+        let roomName = patientRooms[patient._id];
+        if (!roomName) {
+          roomName = medicalPanelService.generateRoomName();
+          setPatientRooms(prev => ({ ...prev, [patient._id]: roomName }));
+        }
+
+        // Construir URL del doctor con _id de la historia clínica (URL completa)
+        const doctorUrl = `${window.location.origin}/doctor/${roomName}?doctor=${medicoCode}&documento=${patient._id}&paciente=${encodeURIComponent(patient.nombres)}`;
+
+        // Abrir ventana del doctor en una nueva pestaña
+        window.open(doctorUrl, '_blank');
       }
-
-      // Construir URL del doctor con _id de la historia clínica (URL completa)
-      const doctorUrl = `${window.location.origin}/doctor/${roomName}?doctor=${medicoCode}&documento=${patient._id}&paciente=${encodeURIComponent(patient.nombres)}`;
-
-      // Abrir ventana del doctor en una nueva pestaña
-      window.open(doctorUrl, '_blank');
     } catch (error) {
       console.error('Error al atender paciente:', error);
       alert('Error al abrir sala de consulta. Inténtalo nuevamente.');
@@ -763,6 +771,26 @@ export function MedicalPanelPage() {
                               </span>
                             )}
                           </h3>
+                          {/* Badge de tipo de consulta */}
+                          {patient.tipoConsulta === 'presencial' ? (
+                            <div className="flex items-center gap-1 bg-purple-500/20 px-2 py-1 rounded-full border border-purple-500/50">
+                              <svg className="w-3 h-3 text-purple-400" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                              </svg>
+                              <span className="text-purple-400 text-xs font-medium uppercase tracking-wide">
+                                Presencial
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 bg-blue-500/20 px-2 py-1 rounded-full border border-blue-500/50">
+                              <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+                              </svg>
+                              <span className="text-blue-400 text-xs font-medium uppercase tracking-wide">
+                                Virtual
+                              </span>
+                            </div>
+                          )}
                           {connectedPatients.has(patient._id) && (
                             <div className="flex items-center gap-2 bg-green-500/20 px-3 py-1 rounded-full border border-green-500/50">
                               <div className="relative flex items-center justify-center w-2 h-2">
@@ -830,66 +858,75 @@ export function MedicalPanelPage() {
                     {!collapsedItems[patient._id] && (
                       <div className="mt-4 pt-4 border-t border-gray-700 flex justify-between items-center">
                         <div className="flex gap-2">
-                          <button
-                            onClick={() => handleContactar(patient)}
-                            disabled={contactingPatient === patient._id || contactedPatients.has(patient._id)}
-                            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                          >
-                            {contactingPatient === patient._id ? (
-                              <>
-                                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Contactando...
-                              </>
-                            ) : contactedPatients.has(patient._id) ? (
-                              <>
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                                </svg>
-                                Contactado
-                              </>
-                            ) : (
-                              <>
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                  <path d="M20 10.999h2C22 5.869 18.127 2 12.99 2v2C17.052 4 20 6.943 20 10.999z"/>
-                                  <path d="M13 8c2.103 0 3 .897 3 3h2c0-3.225-1.775-5-5-5v2zm3.422 5.443a1.001 1.001 0 0 0-1.391.043l-2.393 2.461c-.576-.11-1.734-.471-2.926-1.66-1.192-1.193-1.553-2.354-1.66-2.926l2.459-2.394a1 1 0 0 0 .043-1.391L6.859 3.513a1 1 0 0 0-1.391-.087l-2.17 1.861a1 1 0 0 0-.29.649c-.015.25-.301 6.172 4.291 10.766C11.305 20.707 16.323 21 17.705 21c.202 0 .326-.006.359-.008a.992.992 0 0 0 .648-.291l1.86-2.171a.997.997 0 0 0-.086-1.391l-4.064-3.696z"/>
-                                </svg>
-                                Contactar
-                              </>
-                            )}
-                          </button>
+                          {/* Solo mostrar botones de contacto para consultas virtuales */}
+                          {patient.tipoConsulta !== 'presencial' && (
+                            <>
+                              <button
+                                onClick={() => handleContactar(patient)}
+                                disabled={contactingPatient === patient._id || contactedPatients.has(patient._id)}
+                                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                              >
+                                {contactingPatient === patient._id ? (
+                                  <>
+                                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Contactando...
+                                  </>
+                                ) : contactedPatients.has(patient._id) ? (
+                                  <>
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                    </svg>
+                                    Contactado
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                      <path d="M20 10.999h2C22 5.869 18.127 2 12.99 2v2C17.052 4 20 6.943 20 10.999z"/>
+                                      <path d="M13 8c2.103 0 3 .897 3 3h2c0-3.225-1.775-5-5-5v2zm3.422 5.443a1.001 1.001 0 0 0-1.391.043l-2.393 2.461c-.576-.11-1.734-.471-2.926-1.66-1.192-1.193-1.553-2.354-1.66-2.926l2.459-2.394a1 1 0 0 0 .043-1.391L6.859 3.513a1 1 0 0 0-1.391-.087l-2.17 1.861a1 1 0 0 0-.29.649c-.015.25-.301 6.172 4.291 10.766C11.305 20.707 16.323 21 17.705 21c.202 0 .326-.006.359-.008a.992.992 0 0 0 .648-.291l1.86-2.171a.997.997 0 0 0-.086-1.391l-4.064-3.696z"/>
+                                    </svg>
+                                    Contactar
+                                  </>
+                                )}
+                              </button>
 
-                          <button
-                            onClick={() => handleRellamar(patient)}
-                            disabled={recallingPatient === patient._id}
-                            className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                          >
-                            {recallingPatient === patient._id ? (
-                              <>
-                                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Llamando...
-                              </>
-                            ) : (
-                              <>
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                  <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
-                                </svg>
-                                Rellamar
-                              </>
-                            )}
-                          </button>
+                              <button
+                                onClick={() => handleRellamar(patient)}
+                                disabled={recallingPatient === patient._id}
+                                className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                              >
+                                {recallingPatient === patient._id ? (
+                                  <>
+                                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Llamando...
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                      <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
+                                    </svg>
+                                    Rellamar
+                                  </>
+                                )}
+                              </button>
+                            </>
+                          )}
                         </div>
 
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleAtender(patient)}
                             disabled={attendingPatient === patient._id}
-                            className="bg-[#00a884] text-white px-4 py-2 rounded-lg hover:bg-[#008f6f] transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className={`text-white px-4 py-2 rounded-lg transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${
+                              patient.tipoConsulta === 'presencial'
+                                ? 'bg-purple-600 hover:bg-purple-700'
+                                : 'bg-[#00a884] hover:bg-[#008f6f]'
+                            }`}
                           >
                             {attendingPatient === patient._id ? (
                               <>
@@ -897,7 +934,14 @@ export function MedicalPanelPage() {
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
-                                Abriendo sala...
+                                {patient.tipoConsulta === 'presencial' ? 'Abriendo consulta...' : 'Abriendo sala...'}
+                              </>
+                            ) : patient.tipoConsulta === 'presencial' ? (
+                              <>
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                                </svg>
+                                Atender Presencial
                               </>
                             ) : (
                               <>
