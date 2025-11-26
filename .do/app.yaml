@@ -1,24 +1,14 @@
-name: bsl-consultavideo
+name: panel-medico
 region: nyc
 
-# Dominio personalizado
-domains:
-  - domain: medico-bsl.com
-    type: PRIMARY
-  - domain: www.medico-bsl.com
-    type: ALIAS
-
-# Backend Service (Node.js + Express API + Frontend estatico)
-# Un solo componente = $5/mes (ahorro de costos)
+# Backend Service (Node.js + Express API + Frontend estático)
+# Un solo componente = $5/mes
 services:
   - name: backend
-    # Dockerfile en el directorio raiz construye ambos (backend + frontend)
     dockerfile_path: Dockerfile
-
-    # Port configuration
     http_port: 3000
 
-    # Environment variables (add your Twilio credentials in Digital Ocean dashboard)
+    # Environment variables
     envs:
       - key: NODE_ENV
         value: production
@@ -46,6 +36,22 @@ services:
       - key: WHAPI_TOKEN
         scope: RUN_TIME
         type: SECRET
+      - key: POSTGRES_HOST
+        scope: RUN_TIME
+        type: SECRET
+      - key: POSTGRES_PORT
+        value: "25060"
+      - key: POSTGRES_USER
+        scope: RUN_TIME
+        type: SECRET
+      - key: POSTGRES_PASSWORD
+        scope: RUN_TIME
+        type: SECRET
+      - key: POSTGRES_DATABASE
+        value: "defaultdb"
+      - key: OPENAI_API_KEY
+        scope: RUN_TIME
+        type: SECRET
 
     # Health check
     health_check:
@@ -56,10 +62,10 @@ services:
       success_threshold: 1
       failure_threshold: 3
 
-    # Instance configuration
+    # Instance configuration ($5/mes)
     instance_count: 1
     instance_size_slug: basic-xxs
 
-    # Rutas - El backend ahora sirve tanto API como frontend
+    # Rutas
     routes:
       - path: /

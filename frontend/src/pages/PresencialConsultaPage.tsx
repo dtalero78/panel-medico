@@ -94,77 +94,76 @@ export const PresencialConsultaPage = () => {
 
         {/* Contenido principal */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Área principal - Análisis postural */}
-          <div className="flex-1 flex flex-col">
-            {/* Botón para iniciar análisis postural */}
-            <div className="p-4 border-b border-gray-700 bg-[#1f2c34]">
-              <button
-                onClick={handleTogglePosturalAnalysis}
-                className={`px-6 py-3 rounded-xl font-semibold transition flex items-center gap-2 ${
-                  showPosturalAnalysis
-                    ? 'bg-red-600 hover:bg-red-700 text-white'
-                    : 'bg-purple-600 hover:bg-purple-700 text-white'
-                }`}
-              >
-                {showPosturalAnalysis ? (
-                  <>
+          {showPosturalAnalysis ? (
+            <>
+              {/* Cuando la cámara está activa: Layout dividido */}
+              {/* Área principal - Análisis postural */}
+              <div className="flex-1 flex flex-col">
+                {/* Botón para cerrar análisis postural */}
+                <div className="p-4 border-b border-gray-700 bg-[#1f2c34]">
+                  <button
+                    onClick={handleTogglePosturalAnalysis}
+                    className="px-6 py-3 rounded-xl font-semibold transition flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white"
+                  >
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
                     </svg>
                     Cerrar Análisis Postural
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-                    </svg>
-                    Iniciar Análisis Osteomuscular
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Área de análisis postural o mensaje de bienvenida */}
-            <div className="flex-1 overflow-hidden">
-              {showPosturalAnalysis ? (
-                <LocalPosturalAnalysis
-                  onResultsReady={handlePosturalResults}
-                  patientName={pacienteParam || 'Paciente'}
-                />
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-center p-8">
-                  <div className="bg-[#1f2c34] rounded-2xl p-8 max-w-lg">
-                    <svg className="w-20 h-20 mx-auto mb-6 text-purple-500" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-                    </svg>
-                    <h2 className="text-2xl font-bold text-white mb-4">
-                      Consulta Presencial
-                    </h2>
-                    <p className="text-gray-400 mb-6">
-                      El paciente se encuentra físicamente presente.
-                      Use el panel lateral para revisar y completar la historia clínica.
-                    </p>
-                    <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4">
-                      <p className="text-purple-300 text-sm">
-                        Puede iniciar el <strong>Análisis Osteomuscular</strong> usando la cámara
-                        de su computador para evaluar la postura del paciente.
-                      </p>
-                    </div>
-                  </div>
+                  </button>
                 </div>
-              )}
-            </div>
-          </div>
 
-          {/* Panel lateral - Historia clínica */}
-          <div className="w-[450px] border-l border-gray-700 flex-shrink-0 overflow-hidden">
-            <MedicalHistoryPanel
-              historiaId={historiaIdParam || consultaId}
-              onAppendToObservaciones={(appendFn) => {
-                appendToObservacionesRef.current = appendFn;
-              }}
-            />
-          </div>
+                {/* Área de análisis postural */}
+                <div className="flex-1 overflow-hidden">
+                  <LocalPosturalAnalysis
+                    onResultsReady={handlePosturalResults}
+                    patientName={pacienteParam || 'Paciente'}
+                  />
+                </div>
+              </div>
+
+              {/* Panel lateral - Historia clínica (450px) */}
+              <div className="w-[450px] border-l border-gray-700 flex-shrink-0 overflow-hidden">
+                <MedicalHistoryPanel
+                  historiaId={historiaIdParam || consultaId}
+                  onAppendToObservaciones={(appendFn) => {
+                    appendToObservacionesRef.current = appendFn;
+                  }}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Cuando la cámara NO está activa: Panel grande con botón pequeño */}
+              {/* Barra lateral con botón de análisis */}
+              <div className="w-[200px] flex flex-col bg-[#1f2c34] border-r border-gray-700 p-4">
+                <button
+                  onClick={handleTogglePosturalAnalysis}
+                  className="px-4 py-3 rounded-xl font-semibold transition flex flex-col items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white text-center"
+                >
+                  <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                  </svg>
+                  <span className="text-sm">Iniciar Análisis Osteomuscular</span>
+                </button>
+
+                <div className="mt-6 text-center">
+                  <p className="text-gray-400 text-xs">
+                    Use la cámara para evaluar la postura del paciente
+                  </p>
+                </div>
+              </div>
+
+              {/* Panel principal - Historia clínica (ocupa el resto del espacio) */}
+              <div className="flex-1 overflow-hidden">
+                <MedicalHistoryPanel
+                  historiaId={historiaIdParam || consultaId}
+                  onAppendToObservaciones={(appendFn) => {
+                    appendToObservacionesRef.current = appendFn;
+                  }}
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
     );

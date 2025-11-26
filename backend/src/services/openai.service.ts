@@ -1,8 +1,17 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// OpenAI es opcional - si no hay API key, el servicio retornará un mensaje
+const openaiApiKey = process.env.OPENAI_API_KEY;
+let openai: OpenAI | null = null;
+
+if (openaiApiKey) {
+  openai = new OpenAI({
+    apiKey: openaiApiKey,
+  });
+  console.log('✅ [OpenAI] Servicio de IA inicializado');
+} else {
+  console.log('⚠️  [OpenAI] OPENAI_API_KEY no configurado - servicio de IA no disponible');
+}
 
 interface PatientData {
   // Datos demográficos
@@ -26,6 +35,11 @@ interface PatientData {
 export const generateMedicalRecommendations = async (
   patientData: PatientData
 ): Promise<string> => {
+  // Si OpenAI no está configurado, retornar mensaje informativo
+  if (!openai) {
+    return 'Servicio de IA no disponible. Configure OPENAI_API_KEY para habilitar recomendaciones automáticas.';
+  }
+
   try {
     // Construir el contexto del paciente
     const context = `
