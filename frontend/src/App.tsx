@@ -5,12 +5,9 @@ import { PatientPage } from './pages/PatientPage';
 import { MedicalPanelPage } from './pages/MedicalPanelPage';
 import { PresencialConsultaPage } from './pages/PresencialConsultaPage';
 
-// Base path for production deployment under /pm route
-const basename = import.meta.env.PROD ? '/pm' : '';
-
 function App() {
   return (
-    <BrowserRouter basename={basename}>
+    <BrowserRouter>
       <Routes>
         <Route path="/" element={<Navigate to="/panel-medico" replace />} />
         <Route path="/doctor" element={<DoctorPage />} />
