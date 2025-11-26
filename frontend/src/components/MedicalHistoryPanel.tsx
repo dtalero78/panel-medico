@@ -35,7 +35,7 @@ interface MedicalHistoryData {
 
 interface MedicalHistoryPanelProps {
   historiaId: string;
-  onAppendToObservaciones?: (text: string) => void;
+  onAppendToObservaciones?: (appendFn: (text: string) => void) => void;
 }
 
 export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: MedicalHistoryPanelProps) => {
@@ -77,7 +77,7 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
 
       // "Registrar" la función llamándola inmediatamente
       // Esto permite que el padre llame a esta función cuando sea necesario
-      onAppendToObservaciones(appendText as any);
+      onAppendToObservaciones(appendText);
     }
   }, [onAppendToObservaciones]);
 
