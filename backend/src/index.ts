@@ -91,12 +91,31 @@ app.use('/api/twilio', twilioVoiceRoutes);
 
 // Servir archivos estaticos del frontend (despues de las rutas API)
 const frontendPath = path.join(__dirname, '..', 'frontend-dist');
-app.use(express.static(frontendPath));
 
-// SPA fallback - Todas las rutas no API devuelven index.html
-app.get('*', (_req: Request, res: Response) => {
-  res.sendFile(path.join(frontendPath, 'index.html'));
-});
+// En producción, servir bajo /pm para Digital Ocean
+// En desarrollo, servir desde raíz
+if (appConfig.nodeEnv === 'production') {
+  // Servir assets estáticos bajo /pm
+  app.use('/pm', express.static(frontendPath));
+
+  // SPA fallback para rutas /pm/*
+  app.get('/pm/*', (_req: Request, res: Response) => {
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  });
+
+  // Redirigir /pm a /pm/
+  app.get('/pm', (_req: Request, res: Response) => {
+    res.redirect('/pm/');
+  });
+} else {
+  // Desarrollo: servir desde raíz
+  app.use(express.static(frontendPath));
+
+  // SPA fallback - Todas las rutas no API devuelven index.html
+  app.get('*', (_req: Request, res: Response) => {
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  });
+}
 
 // Error handler
 app.use((err: Error, _req: Request, res: Response) => {
