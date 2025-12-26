@@ -368,6 +368,20 @@ export function MedicalPanelPage() {
     }
   };
 
+  // Función para atender desde el buscador - siempre abre consulta presencial
+  const handleAtenderPresencial = async (patient: Patient) => {
+    setAttendingPatient(patient._id);
+    try {
+      const presencialUrl = `${window.location.origin}/presencial/${patient._id}?doctor=${medicoCode}&documento=${patient._id}&paciente=${encodeURIComponent(patient.nombres)}`;
+      window.open(presencialUrl, '_blank');
+    } catch (error) {
+      console.error('Error al atender paciente:', error);
+      alert('Error al abrir consulta. Inténtalo nuevamente.');
+    } finally {
+      setAttendingPatient(null);
+    }
+  };
+
   const toggleCollapse = (patientId: string) => {
     setCollapsedItems({
       ...collapsedItems,
@@ -702,9 +716,9 @@ export function MedicalPanelPage() {
 
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleAtender(searchResult)}
+                        onClick={() => handleAtenderPresencial(searchResult)}
                         disabled={attendingPatient === searchResult._id}
-                        className="bg-[#00a884] text-white px-4 py-2 rounded-lg hover:bg-[#008f6f] transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         {attendingPatient === searchResult._id ? (
                           <>
@@ -712,14 +726,14 @@ export function MedicalPanelPage() {
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                            Abriendo sala...
+                            Abriendo consulta...
                           </>
                         ) : (
                           <>
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+                              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
                             </svg>
-                            Atender
+                            Atender Presencial
                           </>
                         )}
                       </button>
