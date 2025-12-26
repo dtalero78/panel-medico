@@ -130,10 +130,11 @@ class MedicalPanelService {
          WHERE "medico" = $1 AND "fechaAtencion" >= $2 AND "fechaAtencion" <= $3`,
         [medicoCode, startOfDay, endOfDay]
       ),
-      // Atendidos hoy
+      // Atendidos hoy = Programados hoy que ya tienen fechaConsulta
       postgresService.query(
         `SELECT COUNT(*) as count FROM "HistoriaClinica"
-         WHERE "medico" = $1 AND "fechaConsulta" >= $2 AND "fechaConsulta" <= $3`,
+         WHERE "medico" = $1 AND "fechaAtencion" >= $2 AND "fechaAtencion" <= $3
+         AND "fechaConsulta" IS NOT NULL`,
         [medicoCode, startOfDay, endOfDay]
       ),
       // Restantes hoy (programados sin fechaConsulta)
