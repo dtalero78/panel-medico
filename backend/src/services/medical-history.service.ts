@@ -42,6 +42,7 @@ interface MedicalHistoryData {
   fechaAtencion?: Date;
   fechaConsulta?: Date;
   atendido?: string;
+  medico?: string;
 }
 
 interface UpdateMedicalHistoryPayload {
@@ -139,18 +140,10 @@ class MedicalHistoryService {
         segundoApellido: historiaBase.segundoApellido,
         celular: historiaBase.celular,
         email: historiaBase.email,
-        fechaNacimiento: historiaBase.fechaNacimiento,
-        edad: historiaBase.edad,
-        genero: historiaBase.genero,
-        estadoCivil: historiaBase.estadoCivil,
-        hijos: historiaBase.hijos,
-        ejercicio: historiaBase.ejercicio,
         codEmpresa: historiaBase.codEmpresa,
         tipoExamen: historiaBase.tipoExamen,
-        encuestaSalud: historiaBase.encuestaSalud,
-        antecedentesFamiliares: historiaBase.antecedentesFamiliares,
-        empresa1: historiaBase.empresa1,
         fechaAtencion: historiaBase.fechaAtencion,
+        medico: historiaBase.medico,
 
         // Datos médicos ingresados por el doctor (del payload)
         mdAntecedentes: payload.mdAntecedentes,
