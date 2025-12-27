@@ -244,9 +244,12 @@ class HistoriaClinicaPostgresService {
         const row = result[0];
 
         // Convertir valores de formularios a boolean
-        // Soporta formatos: true, 'true', 'Sí', 'SI'
+        // Soporta formatos: true, 'true', 'Sí', 'SI', 'NO'
         const toBool = (val: any): boolean => {
-          return val === true || val === 'true' || val === 'Sí' || val === 'SI';
+          if (val === 'NO' || val === 'No' || val === 'no' || val === false || val === 'false') {
+            return false;
+          }
+          return val === true || val === 'true' || val === 'Sí' || val === 'SI' || val === 'Si' || val === 'sí';
         };
 
         return {
