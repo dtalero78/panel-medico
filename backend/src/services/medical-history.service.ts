@@ -115,6 +115,7 @@ class MedicalHistoryService {
 
   /**
    * Obtiene la historia clínica de un paciente desde Wix por _id
+   * y combina con datos de formularios desde PostgreSQL
    */
   async getMedicalHistory(historiaId: string): Promise<MedicalHistoryData | null> {
     try {
@@ -126,7 +127,28 @@ class MedicalHistoryService {
 
       if (response.data && response.data.success && response.data.data) {
         console.log(`✅ Historia clínica encontrada para ${historiaId}`);
-        return response.data.data as MedicalHistoryData;
+        const wixData = response.data.data as MedicalHistoryData;
+
+        // PASO ADICIONAL: Obtener antecedentes detallados desde PostgreSQL
+        try {
+          const postgresData = await historiaClinicaPostgresService.getById(historiaId);
+          if (postgresData) {
+            console.log(`✅ [PostgreSQL] Datos de formularios encontrados para ${historiaId}`);
+            // Combinar datos de Wix con antecedentes de PostgreSQL
+            return {
+              ...wixData,
+              antecedentesPersonales: postgresData.antecedentesPersonales,
+              antecedentesFamiliaresDetalle: postgresData.antecedentesFamiliaresDetalle,
+            };
+          } else {
+            console.log(`⚠️  [PostgreSQL] No se encontraron datos de formularios para ${historiaId}`);
+          }
+        } catch (pgError) {
+          console.error(`⚠️  [PostgreSQL] Error obteniendo datos de formularios:`, pgError);
+          // Continuar sin antecedentes detallados si falla PostgreSQL
+        }
+
+        return wixData;
       }
 
       console.warn(`⚠️  No se encontró historia clínica para ${historiaId}`);
