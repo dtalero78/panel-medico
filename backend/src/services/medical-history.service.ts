@@ -1,6 +1,49 @@
 import axios from 'axios';
 import historiaClinicaPostgresService from './historia-clinica-postgres.service';
 
+// Antecedentes personales (27 campos)
+interface AntecedentesPersonales {
+  cirugiaOcular?: boolean;
+  cirugiaProgramada?: boolean;
+  condicionMedica?: boolean;
+  dolorCabeza?: boolean;
+  dolorEspalda?: boolean;
+  embarazo?: boolean;
+  enfermedadHigado?: boolean;
+  enfermedadPulmonar?: boolean;
+  fuma?: boolean;
+  consumoLicor?: boolean;
+  hernias?: boolean;
+  hormigueos?: boolean;
+  presionAlta?: boolean;
+  problemasAzucar?: boolean;
+  problemasCardiacos?: boolean;
+  problemasSueno?: boolean;
+  usaAnteojos?: boolean;
+  usaLentesContacto?: boolean;
+  varices?: boolean;
+  hepatitis?: boolean;
+  trastornoPsicologico?: boolean;
+  sintomasPsicologicos?: boolean;
+  diagnosticoCancer?: boolean;
+  enfermedadesLaborales?: boolean;
+  enfermedadOsteomuscular?: boolean;
+  enfermedadAutoinmune?: boolean;
+  ruidoJaqueca?: boolean;
+}
+
+// Antecedentes familiares (8 campos)
+interface AntecedentesFamiliares {
+  hereditarias?: boolean;
+  geneticas?: boolean;
+  diabetes?: boolean;
+  hipertension?: boolean;
+  infartos?: boolean;
+  cancer?: boolean;
+  trastornos?: boolean;
+  infecciosas?: boolean;
+}
+
 interface MedicalHistoryData {
   // Datos del paciente
   numeroId: string;
@@ -43,6 +86,10 @@ interface MedicalHistoryData {
   fechaConsulta?: Date;
   atendido?: string;
   medico?: string;
+
+  // Antecedentes detallados desde formularios
+  antecedentesPersonales?: AntecedentesPersonales;
+  antecedentesFamiliaresDetalle?: AntecedentesFamiliares;
 }
 
 interface UpdateMedicalHistoryPayload {

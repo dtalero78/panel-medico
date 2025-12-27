@@ -1,5 +1,48 @@
 import postgresService from './postgres.service';
 
+// Antecedentes personales (27 campos)
+interface AntecedentesPersonales {
+  cirugiaOcular?: boolean;
+  cirugiaProgramada?: boolean;
+  condicionMedica?: boolean;
+  dolorCabeza?: boolean;
+  dolorEspalda?: boolean;
+  embarazo?: boolean;
+  enfermedadHigado?: boolean;
+  enfermedadPulmonar?: boolean;
+  fuma?: boolean;
+  consumoLicor?: boolean;
+  hernias?: boolean;
+  hormigueos?: boolean;
+  presionAlta?: boolean;
+  problemasAzucar?: boolean;
+  problemasCardiacos?: boolean;
+  problemasSueno?: boolean;
+  usaAnteojos?: boolean;
+  usaLentesContacto?: boolean;
+  varices?: boolean;
+  hepatitis?: boolean;
+  trastornoPsicologico?: boolean;
+  sintomasPsicologicos?: boolean;
+  diagnosticoCancer?: boolean;
+  enfermedadesLaborales?: boolean;
+  enfermedadOsteomuscular?: boolean;
+  enfermedadAutoinmune?: boolean;
+  ruidoJaqueca?: boolean;
+}
+
+// Antecedentes familiares (8 campos)
+interface AntecedentesFamiliares {
+  hereditarias?: boolean;
+  geneticas?: boolean;
+  diabetes?: boolean;
+  hipertension?: boolean;
+  infartos?: boolean;
+  cancer?: boolean;
+  trastornos?: boolean;
+  infecciosas?: boolean;
+}
+
 interface HistoriaClinicaData {
   _id: string;
   numeroId: string;
@@ -39,6 +82,9 @@ interface HistoriaClinicaData {
   atendido?: string;
   pvEstado?: string;
   medico?: string;
+  // Nuevos campos de formulario
+  antecedentesPersonales?: AntecedentesPersonales;
+  antecedentesFamiliaresDetalle?: AntecedentesFamiliares;
 }
 
 /**
@@ -145,15 +191,108 @@ class HistoriaClinicaPostgresService {
   }
 
   /**
-   * Obtiene una historia clínica por _id
+   * Obtiene una historia clínica por _id con LEFT JOIN a formularios
+   * para incluir antecedentes personales y familiares
    */
   async getById(id: string): Promise<HistoriaClinicaData | null> {
     try {
-      const query = 'SELECT * FROM "HistoriaClinica" WHERE "_id" = $1';
+      const query = `
+        SELECT
+          h.*,
+          f.cirugia_ocular,
+          f.cirugia_programada,
+          f.condicion_medica,
+          f.dolor_cabeza,
+          f.dolor_espalda,
+          f.embarazo,
+          f.enfermedad_higado,
+          f.enfermedad_pulmonar,
+          f.fuma,
+          f.consumo_licor,
+          f.hernias,
+          f.hormigueos,
+          f.presion_alta,
+          f.problemas_azucar,
+          f.problemas_cardiacos,
+          f.problemas_sueno,
+          f.usa_anteojos,
+          f.usa_lentes_contacto,
+          f.varices,
+          f.hepatitis,
+          f.trastorno_psicologico,
+          f.sintomas_psicologicos,
+          f.diagnostico_cancer,
+          f.enfermedades_laborales,
+          f.enfermedad_osteomuscular,
+          f.enfermedad_autoinmune,
+          f.ruido_jaqueca,
+          f.familia_hereditarias,
+          f.familia_geneticas,
+          f.familia_diabetes,
+          f.familia_hipertension,
+          f.familia_infartos,
+          f.familia_cancer,
+          f.familia_trastornos,
+          f.familia_infecciosas
+        FROM "HistoriaClinica" h
+        LEFT JOIN formularios f ON h."numeroId" = f.numero_id
+        WHERE h."_id" = $1
+      `;
       const result = await postgresService.query(query, [id]);
 
       if (result && result.length > 0) {
-        return result[0] as HistoriaClinicaData;
+        const row = result[0];
+
+        // Convertir valores de formularios a boolean
+        // Soporta formatos: true, 'true', 'Sí', 'SI'
+        const toBool = (val: any): boolean => {
+          return val === true || val === 'true' || val === 'Sí' || val === 'SI';
+        };
+
+        return {
+          ...row,
+          // Antecedentes personales (27 campos)
+          antecedentesPersonales: {
+            cirugiaOcular: toBool(row.cirugia_ocular),
+            cirugiaProgramada: toBool(row.cirugia_programada),
+            condicionMedica: toBool(row.condicion_medica),
+            dolorCabeza: toBool(row.dolor_cabeza),
+            dolorEspalda: toBool(row.dolor_espalda),
+            embarazo: toBool(row.embarazo),
+            enfermedadHigado: toBool(row.enfermedad_higado),
+            enfermedadPulmonar: toBool(row.enfermedad_pulmonar),
+            fuma: toBool(row.fuma),
+            consumoLicor: toBool(row.consumo_licor),
+            hernias: toBool(row.hernias),
+            hormigueos: toBool(row.hormigueos),
+            presionAlta: toBool(row.presion_alta),
+            problemasAzucar: toBool(row.problemas_azucar),
+            problemasCardiacos: toBool(row.problemas_cardiacos),
+            problemasSueno: toBool(row.problemas_sueno),
+            usaAnteojos: toBool(row.usa_anteojos),
+            usaLentesContacto: toBool(row.usa_lentes_contacto),
+            varices: toBool(row.varices),
+            hepatitis: toBool(row.hepatitis),
+            trastornoPsicologico: toBool(row.trastorno_psicologico),
+            sintomasPsicologicos: toBool(row.sintomas_psicologicos),
+            diagnosticoCancer: toBool(row.diagnostico_cancer),
+            enfermedadesLaborales: toBool(row.enfermedades_laborales),
+            enfermedadOsteomuscular: toBool(row.enfermedad_osteomuscular),
+            enfermedadAutoinmune: toBool(row.enfermedad_autoinmune),
+            ruidoJaqueca: toBool(row.ruido_jaqueca),
+          },
+          // Antecedentes familiares (8 campos)
+          antecedentesFamiliaresDetalle: {
+            hereditarias: toBool(row.familia_hereditarias),
+            geneticas: toBool(row.familia_geneticas),
+            diabetes: toBool(row.familia_diabetes),
+            hipertension: toBool(row.familia_hipertension),
+            infartos: toBool(row.familia_infartos),
+            cancer: toBool(row.familia_cancer),
+            trastornos: toBool(row.familia_trastornos),
+            infecciosas: toBool(row.familia_infecciosas),
+          },
+        } as HistoriaClinicaData;
       }
 
       return null;
