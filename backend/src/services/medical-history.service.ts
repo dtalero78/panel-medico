@@ -1,4 +1,3 @@
-import axios from 'axios';
 import historiaClinicaPostgresService from './historia-clinica-postgres.service';
 
 // Antecedentes personales (27 campos)
@@ -107,99 +106,45 @@ interface UpdateMedicalHistoryPayload {
 }
 
 class MedicalHistoryService {
-  private wixBaseUrl: string;
-
-  constructor() {
-    this.wixBaseUrl = process.env.WIX_FUNCTIONS_URL || 'https://www.bsl.com.co/_functions';
-  }
 
   /**
-   * Obtiene la historia clínica de un paciente desde Wix por _id
-   * y combina con datos de formularios desde PostgreSQL
+   * Obtiene la historia clínica de un paciente desde PostgreSQL por _id
    */
   async getMedicalHistory(historiaId: string): Promise<MedicalHistoryData | null> {
     try {
-      console.log(`📋 Obteniendo historia clínica para ID: ${historiaId}`);
+      console.log(`📋 [PostgreSQL] Obteniendo historia clínica para ID: ${historiaId}`);
 
-      const response = await axios.get(`${this.wixBaseUrl}/getHistoriaClinica`, {
-        params: { historiaId: historiaId },
-      });
+      const postgresData = await historiaClinicaPostgresService.getById(historiaId);
 
-      if (response.data && response.data.success && response.data.data) {
-        console.log(`✅ Historia clínica encontrada para ${historiaId}`);
-        const wixData = response.data.data as MedicalHistoryData;
-
-        // PASO ADICIONAL: Obtener antecedentes detallados desde PostgreSQL
-        try {
-          const postgresData = await historiaClinicaPostgresService.getById(historiaId);
-          if (postgresData) {
-            console.log(`✅ [PostgreSQL] Datos de formularios encontrados para ${historiaId}`);
-            // Combinar datos de Wix con antecedentes de PostgreSQL
-            return {
-              ...wixData,
-              antecedentesPersonales: postgresData.antecedentesPersonales,
-              antecedentesFamiliaresDetalle: postgresData.antecedentesFamiliaresDetalle,
-            };
-          } else {
-            console.log(`⚠️  [PostgreSQL] No se encontraron datos de formularios para ${historiaId}`);
-          }
-        } catch (pgError) {
-          console.error(`⚠️  [PostgreSQL] Error obteniendo datos de formularios:`, pgError);
-          // Continuar sin antecedentes detallados si falla PostgreSQL
-        }
-
-        return wixData;
+      if (postgresData) {
+        console.log(`✅ [PostgreSQL] Historia clínica encontrada para ${historiaId}`);
+        return postgresData as MedicalHistoryData;
       }
 
-      console.warn(`⚠️  No se encontró historia clínica para ${historiaId}`);
+      console.warn(`⚠️  [PostgreSQL] No se encontró historia clínica para ${historiaId}`);
       return null;
     } catch (error: any) {
-      console.error('❌ Error obteniendo historia clínica:', error.message);
+      console.error('❌ [PostgreSQL] Error obteniendo historia clínica:', error.message);
       throw new Error('Error al obtener historia clínica del paciente');
     }
   }
 
   /**
-   * Actualiza la historia clínica de un paciente en Wix Y PostgreSQL por _id
+   * Actualiza la historia clínica de un paciente en PostgreSQL por _id
    */
   async updateMedicalHistory(payload: UpdateMedicalHistoryPayload): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log(`💾 Actualizando historia clínica para ID: ${payload.historiaId}`);
+      console.log(`💾 [PostgreSQL] Actualizando historia clínica para ID: ${payload.historiaId}`);
 
-      // PASO 0: Obtener datos base del paciente ANTES de actualizar (para PostgreSQL)
+      // Obtener datos base del paciente
       const historiaBase = await this.getMedicalHistory(payload.historiaId);
 
       if (!historiaBase) {
         return { success: false, error: 'No se encontró historia clínica' };
       }
 
-      // PASO 1: Actualizar en Wix (fuente principal)
-      const response = await axios.post(`${this.wixBaseUrl}/updateHistoriaClinica`, {
-        historiaId: payload.historiaId,
-        mdAntecedentes: payload.mdAntecedentes,
-        mdObsParaMiDocYa: payload.mdObsParaMiDocYa,
-        mdObservacionesCertificado: payload.mdObservacionesCertificado,
-        mdRecomendacionesMedicasAdicionales: payload.mdRecomendacionesMedicasAdicionales,
-        mdConceptoFinal: payload.mdConceptoFinal,
-        mdDx1: payload.mdDx1,
-        mdDx2: payload.mdDx2,
-        talla: payload.talla,
-        peso: payload.peso,
-        cargo: payload.cargo,
-        // NO enviamos fechaConsulta - Wix copiará _updatedDate después del update
-        atendido: 'ATENDIDO',
-      });
-
-      if (!response.data || !response.data.success) {
-        console.warn(`⚠️  Respuesta inesperada al actualizar historia clínica: ${JSON.stringify(response.data)}`);
-        return { success: false, error: 'Respuesta inesperada del servidor' };
-      }
-
-      console.log(`✅ [Wix] Historia clínica actualizada exitosamente para ${payload.historiaId}`);
-
-      // PASO 2: Guardar en PostgreSQL INDEPENDIENTEMENTE de Wix
-      // PostgreSQL guarda los datos que el médico ingresó + fechaConsulta = NOW()
-      historiaClinicaPostgresService.upsert({
+      // Actualizar en PostgreSQL
+      const success = await historiaClinicaPostgresService.upsert({
         _id: payload.historiaId,
         // Datos base del paciente (no cambian)
         numeroId: historiaBase.numeroId,
@@ -227,19 +172,21 @@ class MedicalHistoryService {
         cargo: payload.cargo,
 
         // Campos de estado
-        fechaConsulta: new Date(), // IMPORTANTE: PostgreSQL genera su propia fechaConsulta
+        fechaConsulta: new Date(),
         atendido: 'ATENDIDO',
-      }).catch((error) => {
-        // No fallar si PostgreSQL falla (Wix es la fuente principal)
-        console.error(`⚠️  [PostgreSQL] Error guardando historia clínica ${payload.historiaId}:`, error);
       });
 
-      return { success: true };
+      if (success) {
+        console.log(`✅ [PostgreSQL] Historia clínica actualizada exitosamente para ${payload.historiaId}`);
+        return { success: true };
+      } else {
+        return { success: false, error: 'Error al guardar en PostgreSQL' };
+      }
     } catch (error: any) {
-      console.error('❌ Error actualizando historia clínica:', error.message);
+      console.error('❌ [PostgreSQL] Error actualizando historia clínica:', error.message);
       return {
         success: false,
-        error: error.response?.data?.message || error.message || 'Error al actualizar historia clínica'
+        error: error.message || 'Error al actualizar historia clínica'
       };
     }
   }
