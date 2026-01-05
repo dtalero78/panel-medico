@@ -254,6 +254,7 @@ class HistoriaClinicaPostgresService {
 
         return {
           ...row,
+          historiaId: row._id, // Alias para compatibilidad con frontend
           // Antecedentes personales (27 campos)
           antecedentesPersonales: {
             cirugiaOcular: toBool(row.cirugia_ocular),
