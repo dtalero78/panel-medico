@@ -294,6 +294,11 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
   const handleSave = async () => {
     if (!data) return;
 
+    if (!mdConceptoFinal) {
+      alert('Debe seleccionar un Concepto Final antes de guardar.');
+      return;
+    }
+
     try {
       setIsSaving(true);
       setError(null);
