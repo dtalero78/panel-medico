@@ -18,4 +18,7 @@ router.get('/patients/details/:documento', medicalPanelController.getPatientDeta
 // Marcar paciente como "No Contesta"
 router.patch('/patients/:patientId/no-answer', medicalPanelController.markAsNoAnswer);
 
+// Actualizar aprobación desde link de WhatsApp
+router.get('/approve/:historiaId/:decision', medicalPanelController.updateAprobacion);
+
 export default router;
