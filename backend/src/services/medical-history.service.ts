@@ -247,11 +247,18 @@ class MedicalHistoryService {
 
       console.log(`🚨 Enviando alerta OMEGA para ${nombrePaciente} - Concepto: ${payload.mdConceptoFinal}`);
 
-      for (const telefono of telefonos) {
-        await whatsappService.sendTextMessage(telefono, mensaje);
-      }
+      const resultados = await Promise.allSettled(
+        telefonos.map(telefono => whatsappService.sendTextMessage(telefono, mensaje))
+      );
 
-      console.log(`✅ Alertas OMEGA enviadas a ${telefonos.length} destinatarios`);
+      resultados.forEach((resultado, i) => {
+        if (resultado.status === 'fulfilled' && resultado.value.success) {
+          console.log(`✅ Alerta OMEGA enviada a ${telefonos[i]}`);
+        } else {
+          const error = resultado.status === 'rejected' ? resultado.reason : resultado.value.error;
+          console.error(`❌ Error enviando alerta OMEGA a ${telefonos[i]}:`, error);
+        }
+      });
     } catch (error: any) {
       // No bloquear el guardado si falla el envío de alertas
       console.error('❌ Error enviando alerta OMEGA por WhatsApp:', error.message);
