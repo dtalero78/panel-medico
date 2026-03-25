@@ -19,6 +19,6 @@ router.get('/patients/details/:documento', medicalPanelController.getPatientDeta
 router.patch('/patients/:patientId/no-answer', medicalPanelController.markAsNoAnswer);
 
 // Actualizar aprobación desde link de WhatsApp
-router.get('/approve/:historiaId/:decision', medicalPanelController.updateAprobacion);
+router.get('/approve/:historiaId/:decision', (req, res) => medicalPanelController.updateAprobacion(req, res));
 
 export default router;
