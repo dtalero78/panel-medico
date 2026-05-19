@@ -123,6 +123,66 @@ class MedicalPanelController {
     }
   }
   /**
+   * Obtiene los resultados de audiometría (presencial o virtual) para una orden
+   */
+  async getAudiometria(req: Request, res: Response): Promise<void> {
+    try {
+      const { ordenId } = req.params;
+
+      if (!ordenId) {
+        res.status(400).json({ error: 'orden_id requerido' });
+        return;
+      }
+
+      const audiometria = await historiaClinicaPostgresService.getAudiometria(ordenId);
+      res.json({ success: true, data: audiometria });
+    } catch (error) {
+      console.error('Error obteniendo audiometría:', error);
+      res.status(500).json({ error: 'Error obteniendo resultados de audiometría' });
+    }
+  }
+
+  /**
+   * Obtiene los resultados de visiometría presencial para una orden
+   */
+  async getVisiometria(req: Request, res: Response): Promise<void> {
+    try {
+      const { ordenId } = req.params;
+
+      if (!ordenId) {
+        res.status(400).json({ error: 'orden_id requerido' });
+        return;
+      }
+
+      const visiometria = await historiaClinicaPostgresService.getVisiometria(ordenId);
+      res.json({ success: true, data: visiometria });
+    } catch (error) {
+      console.error('Error obteniendo visiometría:', error);
+      res.status(500).json({ error: 'Error obteniendo resultados de visiometría' });
+    }
+  }
+
+  /**
+   * Obtiene los resultados de visiometría virtual (Snellen/Landolt/Ishihara) para una orden
+   */
+  async getVisiometriaVirtual(req: Request, res: Response): Promise<void> {
+    try {
+      const { ordenId } = req.params;
+
+      if (!ordenId) {
+        res.status(400).json({ error: 'orden_id requerido' });
+        return;
+      }
+
+      const visiometria = await historiaClinicaPostgresService.getVisiometriaVirtual(ordenId);
+      res.json({ success: true, data: visiometria });
+    } catch (error) {
+      console.error('Error obteniendo visiometría virtual:', error);
+      res.status(500).json({ error: 'Error obteniendo resultados de visiometría virtual' });
+    }
+  }
+
+  /**
    * Obtiene los resultados de laboratorios para una orden
    */
   async getLaboratorios(req: Request, res: Response): Promise<void> {

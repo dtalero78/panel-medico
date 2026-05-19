@@ -322,6 +322,56 @@ class HistoriaClinicaPostgresService {
   }
 
   /**
+   * Obtiene el registro más reciente de audiometría para una orden.
+   * La tabla `audiometrias` es compartida entre audiometría presencial y virtual.
+   */
+  async getAudiometria(ordenId: string): Promise<any | null> {
+    try {
+      const result = await postgresService.query(
+        `SELECT * FROM audiometrias WHERE orden_id = $1 ORDER BY created_at DESC LIMIT 1`,
+        [ordenId]
+      );
+      return result && result.length > 0 ? result[0] : null;
+    } catch (error) {
+      console.error(`❌ [PostgreSQL] Error obteniendo audiometría ${ordenId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Obtiene el registro más reciente de visiometría presencial para una orden.
+   */
+  async getVisiometria(ordenId: string): Promise<any | null> {
+    try {
+      const result = await postgresService.query(
+        `SELECT * FROM visiometrias WHERE orden_id = $1 ORDER BY created_at DESC LIMIT 1`,
+        [ordenId]
+      );
+      return result && result.length > 0 ? result[0] : null;
+    } catch (error) {
+      console.error(`❌ [PostgreSQL] Error obteniendo visiometría ${ordenId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Obtiene el registro de visiometría virtual (Snellen/Landolt/Ishihara) para una orden.
+   * UNIQUE(orden_id) en la tabla.
+   */
+  async getVisiometriaVirtual(ordenId: string): Promise<any | null> {
+    try {
+      const result = await postgresService.query(
+        `SELECT * FROM visiometrias_virtual WHERE orden_id = $1 LIMIT 1`,
+        [ordenId]
+      );
+      return result && result.length > 0 ? result[0] : null;
+    } catch (error) {
+      console.error(`❌ [PostgreSQL] Error obteniendo visiometría virtual ${ordenId}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Obtiene los registros de laboratorios asociados a una orden (HistoriaClinica._id)
    */
   async getLaboratorios(ordenId: string): Promise<any[]> {

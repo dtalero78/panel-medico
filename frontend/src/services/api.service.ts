@@ -132,6 +132,30 @@ class ApiService {
   }
 
   /**
+   * Obtener resultados de audiometría (presencial o virtual) para una orden
+   */
+  async getAudiometria(ordenId: string): Promise<any | null> {
+    const response = await this.client.get(`/api/medical-panel/audiometria/${ordenId}`);
+    return response.data?.data || null;
+  }
+
+  /**
+   * Obtener resultados de visiometría presencial para una orden
+   */
+  async getVisiometria(ordenId: string): Promise<any | null> {
+    const response = await this.client.get(`/api/medical-panel/visiometria/${ordenId}`);
+    return response.data?.data || null;
+  }
+
+  /**
+   * Obtener resultados de visiometría virtual (Snellen/Landolt/Ishihara)
+   */
+  async getVisiometriaVirtual(ordenId: string): Promise<any | null> {
+    const response = await this.client.get(`/api/medical-panel/visiometria-virtual/${ordenId}`);
+    return response.data?.data || null;
+  }
+
+  /**
    * Actualizar historia clínica de un paciente
    */
   async updateMedicalHistory(payload: {

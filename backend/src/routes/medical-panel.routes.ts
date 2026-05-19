@@ -18,6 +18,15 @@ router.get('/patients/details/:documento', medicalPanelController.getPatientDeta
 // Resultados de laboratorios para una orden (HistoriaClinica._id)
 router.get('/laboratorios/:ordenId', medicalPanelController.getLaboratorios);
 
+// Resultados de audiometría (presencial o virtual) para una orden
+router.get('/audiometria/:ordenId', medicalPanelController.getAudiometria);
+
+// Resultados de visiometría presencial para una orden
+router.get('/visiometria/:ordenId', medicalPanelController.getVisiometria);
+
+// Resultados de visiometría virtual (Snellen/Landolt/Ishihara) para una orden
+router.get('/visiometria-virtual/:ordenId', medicalPanelController.getVisiometriaVirtual);
+
 // Marcar paciente como "No Contesta"
 router.patch('/patients/:patientId/no-answer', medicalPanelController.markAsNoAnswer);
 

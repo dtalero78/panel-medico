@@ -199,6 +199,149 @@ const hasLabValue = (val: any): boolean => {
   return true;
 };
 
+// Frecuencias de audiometría (Hz)
+const AUDIO_FREQS_AEREO = [250, 500, 1000, 2000, 3000, 4000, 6000, 8000] as const;
+const AUDIO_FREQS_OSEO = [250, 500, 1000, 2000, 3000, 4000] as const;
+
+const AUDIO_OTOSCOPIA_FIELDS: LabFieldTuple[] = [
+  ['pabellon_auricular_od', 'Pabellón Auricular OD'],
+  ['pabellon_auricular_oi', 'Pabellón Auricular OI'],
+  ['conducto_auditivo_od', 'Conducto Auditivo OD'],
+  ['conducto_auditivo_oi', 'Conducto Auditivo OI'],
+  ['membrana_timpanica_od', 'Membrana Timpánica OD'],
+  ['membrana_timpanica_oi', 'Membrana Timpánica OI'],
+  ['observaciones_od', 'Observaciones OD'],
+  ['observaciones_oi', 'Observaciones OI'],
+  ['requiere_limpieza_otica', 'Requiere Limpieza Ótica'],
+  ['estado_gripal', 'Estado Gripal'],
+];
+
+const AUDIO_DIAGNOSTICO_FIELDS: LabFieldTuple[] = [
+  ['diagnostico_od', 'Diagnóstico OD'],
+  ['diagnostico_oi', 'Diagnóstico OI'],
+  ['interpretacion', 'Interpretación'],
+  ['recomendaciones', 'Recomendaciones'],
+  ['remision', 'Remisión'],
+  ['cabina', 'Cabina'],
+  ['equipo', 'Equipo'],
+];
+
+// Visiometría presencial — agrupada por área (mismo patrón visual que laboratorios)
+const VISIOMETRIA_GROUPS: LabGroup[] = [
+  {
+    title: 'Visión Lejana',
+    fields: [
+      ['vl_od_sin_correccion', 'OD sin corrección'],
+      ['vl_od_con_correccion', 'OD con corrección'],
+      ['vl_oi_sin_correccion', 'OI sin corrección'],
+      ['vl_oi_con_correccion', 'OI con corrección'],
+      ['vl_ao_sin_correccion', 'AO sin corrección'],
+      ['vl_ao_con_correccion', 'AO con corrección'],
+      ['vl_foria_lateral', 'Foria Lateral'],
+      ['vl_foria_vertical', 'Foria Vertical'],
+    ],
+  },
+  {
+    title: 'Visión Cercana',
+    fields: [
+      ['vc_od_sin_correccion', 'OD sin corrección'],
+      ['vc_od_con_correccion', 'OD con corrección'],
+      ['vc_oi_sin_correccion', 'OI sin corrección'],
+      ['vc_oi_con_correccion', 'OI con corrección'],
+      ['vc_ao_sin_correccion', 'AO sin corrección'],
+      ['vc_ao_con_correccion', 'AO con corrección'],
+      ['vc_foria_lateral', 'Foria Lateral'],
+      ['vc_campimetria', 'Campimetría'],
+    ],
+  },
+  {
+    title: 'Cromática, Forias y Cover Test',
+    fields: [
+      ['vision_cromatica', 'Visión Cromática'],
+      ['ishihara', 'Ishihara'],
+      ['ppc', 'PPC'],
+      ['enceguecimiento', 'Enceguecimiento'],
+      ['estado_forico', 'Estado Fórico'],
+      ['cover_test_lejos', 'Cover Test Lejos'],
+      ['cover_test_cerca', 'Cover Test Cerca'],
+    ],
+  },
+  {
+    title: 'Examen Externo y Tonometría',
+    fields: [
+      ['examen_externo', 'Examen Externo'],
+      ['oftalmoscopia_od', 'Oftalmoscopia OD'],
+      ['oftalmoscopia_oi', 'Oftalmoscopia OI'],
+      ['biomicroscopia_od', 'Biomicroscopia OD'],
+      ['biomicroscopia_oi', 'Biomicroscopia OI'],
+      ['tonometria_od', 'Tonometría OD'],
+      ['tonometria_oi', 'Tonometría OI'],
+      ['queratometria_od', 'Queratometría OD'],
+      ['queratometria_oi', 'Queratometría OI'],
+    ],
+  },
+  {
+    title: 'Refractometría y Rx',
+    fields: [
+      ['rx_en_uso', 'Rx en Uso'],
+      ['refractometria_od', 'Refractometría OD'],
+      ['refractometria_oi', 'Refractometría OI'],
+      ['subjetivo_od', 'Subjetivo OD'],
+      ['subjetivo_oi', 'Subjetivo OI'],
+      ['rx_final_od', 'Rx Final OD'],
+      ['rx_final_oi', 'Rx Final OI'],
+      ['dip', 'DIP'],
+      ['filtro', 'Filtro'],
+      ['uso', 'Uso'],
+    ],
+  },
+  {
+    title: 'Diagnóstico Visiométrico',
+    fields: [
+      ['diagnostico', 'Diagnóstico'],
+      ['dx2', 'Dx 2'],
+      ['dx3', 'Dx 3'],
+      ['control', 'Control'],
+      ['remision', 'Remisión'],
+      ['observaciones', 'Observaciones'],
+    ],
+  },
+];
+
+const audiometriaHasAereo = (row: any): boolean =>
+  !!row && AUDIO_FREQS_AEREO.some((f) =>
+    hasLabValue(row[`aereo_od_${f}`]) || hasLabValue(row[`aereo_oi_${f}`])
+  );
+
+const audiometriaHasOseo = (row: any): boolean =>
+  !!row && AUDIO_FREQS_OSEO.some((f) =>
+    hasLabValue(row[`oseo_od_${f}`]) || hasLabValue(row[`oseo_oi_${f}`])
+  );
+
+const audiometriaHasContent = (row: any): boolean => {
+  if (!row) return false;
+  if (audiometriaHasAereo(row) || audiometriaHasOseo(row)) return true;
+  const otherFields = [...AUDIO_OTOSCOPIA_FIELDS, ...AUDIO_DIAGNOSTICO_FIELDS];
+  return otherFields.some(([key]) => hasLabValue(row[key]));
+};
+
+const visiometriaHasContent = (row: any): boolean => {
+  if (!row) return false;
+  return VISIOMETRIA_GROUPS.some((group) =>
+    group.fields.some(([key]) => hasLabValue(row[key]))
+  );
+};
+
+const visiometriaVirtualHasContent = (row: any): boolean => {
+  if (!row) return false;
+  return (
+    hasLabValue(row.snellen_porcentaje) ||
+    hasLabValue(row.landolt_porcentaje) ||
+    hasLabValue(row.ishihara_porcentaje) ||
+    hasLabValue(row.concepto)
+  );
+};
+
 const consolidarLaboratorios = (rows: any[]): Record<string, string> => {
   const consolidado: Record<string, string> = {};
   if (!Array.isArray(rows) || rows.length === 0) return consolidado;
@@ -221,6 +364,9 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<MedicalHistoryData | null>(null);
   const [laboratorios, setLaboratorios] = useState<Record<string, string>>({});
+  const [audiometria, setAudiometria] = useState<any | null>(null);
+  const [visiometria, setVisiometria] = useState<any | null>(null);
+  const [visiometriaVirtual, setVisiometriaVirtual] = useState<any | null>(null);
 
   // Función para traducir nombres de campos a español
   const formatFieldName = (fieldName: string): string => {
@@ -374,14 +520,27 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
       const history = await apiService.getMedicalHistory(historiaId);
       setData(history);
 
-      // Cargar resultados de laboratorios en paralelo (no bloquea si falla)
-      try {
-        const labs = await apiService.getLaboratorios(historiaId);
-        setLaboratorios(consolidarLaboratorios(labs));
-      } catch (labErr) {
-        console.warn('No se pudieron cargar los laboratorios:', labErr);
-        setLaboratorios({});
-      }
+      // Cargar resultados complementarios en paralelo (no bloquea si alguno falla)
+      const [labsRes, audioRes, visRes, visVirtualRes] = await Promise.allSettled([
+        apiService.getLaboratorios(historiaId),
+        apiService.getAudiometria(historiaId),
+        apiService.getVisiometria(historiaId),
+        apiService.getVisiometriaVirtual(historiaId),
+      ]);
+
+      setLaboratorios(
+        labsRes.status === 'fulfilled' ? consolidarLaboratorios(labsRes.value) : {}
+      );
+      setAudiometria(audioRes.status === 'fulfilled' ? audioRes.value : null);
+      setVisiometria(visRes.status === 'fulfilled' ? visRes.value : null);
+      setVisiometriaVirtual(
+        visVirtualRes.status === 'fulfilled' ? visVirtualRes.value : null
+      );
+
+      if (labsRes.status === 'rejected') console.warn('Laboratorios:', labsRes.reason);
+      if (audioRes.status === 'rejected') console.warn('Audiometría:', audioRes.reason);
+      if (visRes.status === 'rejected') console.warn('Visiometría:', visRes.reason);
+      if (visVirtualRes.status === 'rejected') console.warn('Visiometría virtual:', visVirtualRes.reason);
 
       // Pre-llenar campos editables
       setMdAntecedentes(history.mdAntecedentes || '');
@@ -666,6 +825,187 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
           </div>
         );
       })}
+
+      {/* Audiometría (presencial o virtual — misma tabla) */}
+      {audiometriaHasContent(audiometria) && (
+        <div className="bg-[#2a3942] rounded-lg p-3">
+          <h3 className="text-sm font-semibold mb-2 text-[#00a884]">Audiometría</h3>
+
+          {/* Otoscopia (pares clave-valor) */}
+          {(() => {
+            const visible = AUDIO_OTOSCOPIA_FIELDS.filter(([key]) => hasLabValue(audiometria[key]));
+            if (visible.length === 0) return null;
+            return (
+              <div className="mb-3">
+                <h4 className="text-xs font-semibold text-gray-300 mb-1">Otoscopia</h4>
+                <div className="space-y-2 text-xs">
+                  {visible.map(([key, label]) => (
+                    <div key={key}>
+                      <span className="text-gray-400">{label}:</span>
+                      <span className="text-white ml-2 whitespace-pre-wrap break-words">{audiometria[key]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Umbrales Aéreos (mini-tabla dB HL) */}
+          {audiometriaHasAereo(audiometria) && (
+            <div className="mb-3">
+              <h4 className="text-xs font-semibold text-gray-300 mb-1">Vía Aérea (dB HL)</h4>
+              <div className="overflow-x-auto">
+                <table className="text-xs w-full">
+                  <thead>
+                    <tr className="text-gray-400">
+                      <th className="text-left py-1 pr-2 font-normal">Hz</th>
+                      {AUDIO_FREQS_AEREO.map((f) => (
+                        <th key={f} className="text-center py-1 px-1 font-normal">{f}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="text-gray-400 py-1 pr-2">OD</td>
+                      {AUDIO_FREQS_AEREO.map((f) => (
+                        <td key={f} className="text-center text-white py-1 px-1">
+                          {hasLabValue(audiometria[`aereo_od_${f}`]) ? audiometria[`aereo_od_${f}`] : '—'}
+                        </td>
+                      ))}
+                    </tr>
+                    <tr>
+                      <td className="text-gray-400 py-1 pr-2">OI</td>
+                      {AUDIO_FREQS_AEREO.map((f) => (
+                        <td key={f} className="text-center text-white py-1 px-1">
+                          {hasLabValue(audiometria[`aereo_oi_${f}`]) ? audiometria[`aereo_oi_${f}`] : '—'}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Umbrales Óseos (mini-tabla dB HL) */}
+          {audiometriaHasOseo(audiometria) && (
+            <div className="mb-3">
+              <h4 className="text-xs font-semibold text-gray-300 mb-1">Vía Ósea (dB HL)</h4>
+              <div className="overflow-x-auto">
+                <table className="text-xs w-full">
+                  <thead>
+                    <tr className="text-gray-400">
+                      <th className="text-left py-1 pr-2 font-normal">Hz</th>
+                      {AUDIO_FREQS_OSEO.map((f) => (
+                        <th key={f} className="text-center py-1 px-1 font-normal">{f}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="text-gray-400 py-1 pr-2">OD</td>
+                      {AUDIO_FREQS_OSEO.map((f) => (
+                        <td key={f} className="text-center text-white py-1 px-1">
+                          {hasLabValue(audiometria[`oseo_od_${f}`]) ? audiometria[`oseo_od_${f}`] : '—'}
+                        </td>
+                      ))}
+                    </tr>
+                    <tr>
+                      <td className="text-gray-400 py-1 pr-2">OI</td>
+                      {AUDIO_FREQS_OSEO.map((f) => (
+                        <td key={f} className="text-center text-white py-1 px-1">
+                          {hasLabValue(audiometria[`oseo_oi_${f}`]) ? audiometria[`oseo_oi_${f}`] : '—'}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Diagnóstico audiométrico */}
+          {(() => {
+            const visible = AUDIO_DIAGNOSTICO_FIELDS.filter(([key]) => hasLabValue(audiometria[key]));
+            if (visible.length === 0) return null;
+            return (
+              <div>
+                <h4 className="text-xs font-semibold text-gray-300 mb-1">Diagnóstico</h4>
+                <div className="space-y-2 text-xs">
+                  {visible.map(([key, label]) => (
+                    <div key={key}>
+                      <span className="text-gray-400">{label}:</span>
+                      <span className="text-white ml-2 whitespace-pre-wrap break-words">{audiometria[key]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Visiometría presencial (agrupada por área) */}
+      {visiometriaHasContent(visiometria) &&
+        VISIOMETRIA_GROUPS.map((group) => {
+          const visibleFields = group.fields.filter(([key]) => hasLabValue(visiometria[key]));
+          if (visibleFields.length === 0) return null;
+          return (
+            <div key={`vis-${group.title}`} className="bg-[#2a3942] rounded-lg p-3">
+              <h3 className="text-sm font-semibold mb-2 text-[#00a884]">{group.title}</h3>
+              <div className="space-y-2 text-xs">
+                {visibleFields.map(([key, label]) => (
+                  <div key={key}>
+                    <span className="text-gray-400">{label}:</span>
+                    <span className="text-white ml-2 whitespace-pre-wrap break-words">{visiometria[key]}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+
+      {/* Visiometría Virtual (Snellen / Landolt / Ishihara) */}
+      {visiometriaVirtualHasContent(visiometriaVirtual) && (
+        <div className="bg-[#2a3942] rounded-lg p-3">
+          <h3 className="text-sm font-semibold mb-2 text-[#00a884]">Visiometría Virtual</h3>
+          <div className="space-y-2 text-xs">
+            {hasLabValue(visiometriaVirtual.snellen_porcentaje) && (
+              <div>
+                <span className="text-gray-400">Snellen (Letras):</span>
+                <span className="text-white ml-2">
+                  {visiometriaVirtual.snellen_correctas ?? '—'} / {visiometriaVirtual.snellen_total ?? '—'}
+                  {' '}({visiometriaVirtual.snellen_porcentaje}%)
+                </span>
+              </div>
+            )}
+            {hasLabValue(visiometriaVirtual.landolt_porcentaje) && (
+              <div>
+                <span className="text-gray-400">Landolt C (Dirección):</span>
+                <span className="text-white ml-2">
+                  {visiometriaVirtual.landolt_correctas ?? '—'} / {visiometriaVirtual.landolt_total ?? '—'}
+                  {' '}({visiometriaVirtual.landolt_porcentaje}%)
+                </span>
+              </div>
+            )}
+            {hasLabValue(visiometriaVirtual.ishihara_porcentaje) && (
+              <div>
+                <span className="text-gray-400">Ishihara (Colores):</span>
+                <span className="text-white ml-2">
+                  {visiometriaVirtual.ishihara_correctas ?? '—'} / {visiometriaVirtual.ishihara_total ?? '—'}
+                  {' '}({visiometriaVirtual.ishihara_porcentaje}%)
+                </span>
+              </div>
+            )}
+            {hasLabValue(visiometriaVirtual.concepto) && (
+              <div>
+                <span className="text-gray-400">Concepto:</span>
+                <span className="text-white ml-2 whitespace-pre-wrap break-words">{visiometriaVirtual.concepto}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Medidas Físicas */}
       <div className="bg-[#2a3942] rounded-lg p-3">
