@@ -1264,6 +1264,9 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
               <>
                 <option value="APTO">APTO</option>
                 <option value="APTO CON RECOMENDACIONES">APTO CON RECOMENDACIONES</option>
+                <option value="APTO PARA MANIPULACIÓN DE ALIMENTOS">APTO PARA MANIPULACIÓN DE ALIMENTOS</option>
+                <option value="APTO PARA TRABAJO EN ALTURAS">APTO PARA TRABAJO EN ALTURAS</option>
+                <option value="APTO PARA TRABAJO EN ALTURAS Y ESPACIOS CONFINADOS">APTO PARA TRABAJO EN ALTURAS Y ESPACIOS CONFINADOS</option>
                 <option value="APLAZADO">APLAZADO</option>
                 <option value="NO APTO">NO APTO</option>
                 <option value="NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL">NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL</option>
