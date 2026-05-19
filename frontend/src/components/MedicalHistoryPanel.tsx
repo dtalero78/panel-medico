@@ -83,11 +83,144 @@ interface MedicalHistoryPanelProps {
   onAppendToObservaciones?: (appendFn: (text: string) => void) => void;
 }
 
+type LabFieldTuple = [string, string];
+interface LabGroup {
+  title: string;
+  fields: LabFieldTuple[];
+}
+
+const LAB_GROUPS: LabGroup[] = [
+  {
+    title: 'Hemograma',
+    fields: [
+      ['hematocrito', 'Hematocrito'],
+      ['hemoglobina', 'Hemoglobina'],
+      ['conc_corpus_hb', 'Conc. Corpuscular Hb'],
+      ['plaquetas', 'Plaquetas'],
+      ['sedimentacio_globular', 'Sed. Globular'],
+      ['globulos_blancos', 'Glóbulos Blancos'],
+      ['neutrofilos', 'Neutrófilos'],
+      ['linfocitos', 'Linfocitos'],
+      ['monocitos', 'Monocitos'],
+      ['basofilos', 'Basófilos'],
+      ['eosinofilos', 'Eosinófilos'],
+      ['cayados', 'Cayados'],
+      ['observaciones_hemograma', 'Observaciones'],
+    ],
+  },
+  {
+    title: 'Coprológico',
+    fields: [
+      ['consistencia', 'Consistencia'],
+      ['color', 'Color'],
+      ['olor', 'Olor'],
+      ['moco', 'Moco'],
+      ['sangre', 'Sangre'],
+      ['parasitologico', 'Parasitológico'],
+      ['vegetales', 'Vegetales'],
+      ['musculares', 'Musculares'],
+      ['celulosa', 'Celulosa'],
+      ['almidones', 'Almidones'],
+      ['levaduras', 'Levaduras'],
+      ['hongos', 'Hongos'],
+      ['neutras', 'Neutras'],
+      ['hominis', 'Hominis'],
+      ['leucocitos', 'Leucocitos'],
+      ['bacteriana', 'Flora Bacteriana'],
+      ['observaciones_coprologico', 'Observaciones'],
+    ],
+  },
+  {
+    title: 'Química / Perfil Lipídico',
+    fields: [
+      ['glicemia_pre', 'Glicemia (pre)'],
+      ['glicemia_post', 'Glicemia (post)'],
+      ['tsh', 'TSH'],
+      ['colesterol_total', 'Colesterol Total'],
+      ['colesterol_hdl', 'Colesterol HDL'],
+      ['colesterol_ldl', 'Colesterol LDL'],
+      ['trigliceridos', 'Triglicéridos'],
+      ['transaminasa_gpt', 'Transaminasa GPT'],
+      ['transaminasa_got', 'Transaminasa GOT'],
+      ['bilirrubina_directa', 'Bilirrubina Directa'],
+      ['bilirrubina_indirecta', 'Bilirrubina Indirecta'],
+      ['bilirrubina_total', 'Bilirrubina Total'],
+      ['nitrogeno_ureico_bun', 'Nitrógeno Ureico (BUN)'],
+      ['creatinina_en_suero', 'Creatinina en Suero'],
+      ['colinesterasa', 'Colinesterasa'],
+      ['fosfatasa_alcalina', 'Fosfatasa Alcalina'],
+      ['quimica_observaciones', 'Observaciones'],
+    ],
+  },
+  {
+    title: 'Inmunología',
+    fields: [
+      ['grupo_sanguineo', 'Grupo Sanguíneo'],
+      ['factor_rh', 'Factor Rh'],
+      ['serologia_vdrl', 'Serología VDRL'],
+      ['serologia_cuantitativa', 'Serología Cuantitativa'],
+      ['como_reporto_a_la_empresa', 'Cómo se Reportó a la Empresa'],
+      ['inmunologia_observaciones', 'Observaciones'],
+    ],
+  },
+  {
+    title: 'Microbiología',
+    fields: [
+      ['frotis_faringeo', 'Frotis Faríngeo'],
+      ['cultivo_faringeo', 'Cultivo Faríngeo'],
+      ['frotis_naso_derecha', 'Frotis Naso (Derecha)'],
+      ['frotis_naso_izquierda', 'Frotis Naso (Izquierda)'],
+      ['koh_en_unas', 'KOH en Uñas'],
+      ['coprocultivo', 'Coprocultivo'],
+      ['leptospira', 'Leptospira'],
+      ['baciloscopia', 'Baciloscopia'],
+      ['microbiologia_observaciones', 'Observaciones'],
+    ],
+  },
+  {
+    title: 'Toxicología',
+    fields: [
+      ['alcohol_aire_respirado', 'Alcohol (Aire Respirado)'],
+      ['alcohol_saliva', 'Alcohol (Saliva)'],
+      ['alcohol_sangre', 'Alcohol (Sangre)'],
+      ['marihuana_orina', 'Marihuana (Orina)'],
+      ['cocaina', 'Cocaína'],
+      ['morfina', 'Morfina'],
+      ['metanfetaminas', 'Metanfetaminas'],
+      ['anfetaminas', 'Anfetaminas'],
+      ['toxicologia_observaciones', 'Observaciones'],
+    ],
+  },
+];
+
+const hasLabValue = (val: any): boolean => {
+  if (val === null || val === undefined) return false;
+  if (typeof val === 'string' && val.trim() === '') return false;
+  return true;
+};
+
+const consolidarLaboratorios = (rows: any[]): Record<string, string> => {
+  const consolidado: Record<string, string> = {};
+  if (!Array.isArray(rows) || rows.length === 0) return consolidado;
+  // Las filas vienen ORDER BY created_at DESC. Recorremos de la más vieja a la más nueva
+  // para que la más reciente sobrescriba campos repetidos.
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const row = rows[i] || {};
+    Object.keys(row).forEach((key) => {
+      if (hasLabValue(row[key])) {
+        consolidado[key] = String(row[key]);
+      }
+    });
+  }
+  return consolidado;
+};
+
 export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: MedicalHistoryPanelProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<MedicalHistoryData | null>(null);
+  const [laboratorios, setLaboratorios] = useState<Record<string, string>>({});
 
   // Función para traducir nombres de campos a español
   const formatFieldName = (fieldName: string): string => {
@@ -240,6 +373,15 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
       setError(null);
       const history = await apiService.getMedicalHistory(historiaId);
       setData(history);
+
+      // Cargar resultados de laboratorios en paralelo (no bloquea si falla)
+      try {
+        const labs = await apiService.getLaboratorios(historiaId);
+        setLaboratorios(consolidarLaboratorios(labs));
+      } catch (labErr) {
+        console.warn('No se pudieron cargar los laboratorios:', labErr);
+        setLaboratorios({});
+      }
 
       // Pre-llenar campos editables
       setMdAntecedentes(history.mdAntecedentes || '');
@@ -505,6 +647,25 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
           </div>
         </div>
       )}
+
+      {/* Resultados de Laboratorio (solo lectura, agrupado por área) */}
+      {LAB_GROUPS.map((group) => {
+        const visibleFields = group.fields.filter(([key]) => hasLabValue(laboratorios[key]));
+        if (visibleFields.length === 0) return null;
+        return (
+          <div key={group.title} className="bg-[#2a3942] rounded-lg p-3">
+            <h3 className="text-sm font-semibold mb-2 text-[#00a884]">{group.title}</h3>
+            <div className="space-y-2 text-xs">
+              {visibleFields.map(([key, label]) => (
+                <div key={key}>
+                  <span className="text-gray-400">{label}:</span>
+                  <span className="text-white ml-2 whitespace-pre-wrap break-words">{laboratorios[key]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
 
       {/* Medidas Físicas */}
       <div className="bg-[#2a3942] rounded-lg p-3">

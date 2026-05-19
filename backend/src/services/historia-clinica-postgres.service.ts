@@ -322,6 +322,22 @@ class HistoriaClinicaPostgresService {
   }
 
   /**
+   * Obtiene los registros de laboratorios asociados a una orden (HistoriaClinica._id)
+   */
+  async getLaboratorios(ordenId: string): Promise<any[]> {
+    try {
+      const result = await postgresService.query(
+        `SELECT * FROM laboratorios WHERE orden_id = $1 ORDER BY created_at DESC`,
+        [ordenId]
+      );
+      return (result || []) as any[];
+    } catch (error) {
+      console.error(`❌ [PostgreSQL] Error obteniendo laboratorios ${ordenId}:`, error);
+      return [];
+    }
+  }
+
+  /**
    * Actualiza el campo aprobacion de una historia clínica
    */
   async updateAprobacion(historiaId: string, aprobacion: string): Promise<boolean> {

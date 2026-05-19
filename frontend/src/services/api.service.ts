@@ -124,6 +124,14 @@ class ApiService {
   }
 
   /**
+   * Obtener resultados de laboratorios para una orden (HistoriaClinica._id)
+   */
+  async getLaboratorios(ordenId: string): Promise<any[]> {
+    const response = await this.client.get(`/api/medical-panel/laboratorios/${ordenId}`);
+    return response.data?.data || [];
+  }
+
+  /**
    * Actualizar historia clínica de un paciente
    */
   async updateMedicalHistory(payload: {

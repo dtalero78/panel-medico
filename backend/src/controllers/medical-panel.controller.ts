@@ -123,6 +123,26 @@ class MedicalPanelController {
     }
   }
   /**
+   * Obtiene los resultados de laboratorios para una orden
+   */
+  async getLaboratorios(req: Request, res: Response): Promise<void> {
+    try {
+      const { ordenId } = req.params;
+
+      if (!ordenId) {
+        res.status(400).json({ error: 'orden_id requerido' });
+        return;
+      }
+
+      const laboratorios = await historiaClinicaPostgresService.getLaboratorios(ordenId);
+      res.json({ success: true, data: laboratorios });
+    } catch (error) {
+      console.error('Error obteniendo laboratorios:', error);
+      res.status(500).json({ error: 'Error obteniendo resultados de laboratorio' });
+    }
+  }
+
+  /**
    * Actualiza el campo aprobacion de una historia clínica (llamado desde link de WhatsApp)
    */
   async updateAprobacion(req: Request, res: Response): Promise<void> {

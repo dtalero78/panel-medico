@@ -15,6 +15,9 @@ router.get('/patients/search/:documento', medicalPanelController.searchPatientBy
 // Detalles completos de un paciente
 router.get('/patients/details/:documento', medicalPanelController.getPatientDetails);
 
+// Resultados de laboratorios para una orden (HistoriaClinica._id)
+router.get('/laboratorios/:ordenId', medicalPanelController.getLaboratorios);
+
 // Marcar paciente como "No Contesta"
 router.patch('/patients/:patientId/no-answer', medicalPanelController.markAsNoAnswer);
 
