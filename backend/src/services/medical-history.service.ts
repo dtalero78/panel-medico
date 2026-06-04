@@ -144,23 +144,8 @@ class MedicalHistoryService {
         return { success: false, error: 'No se encontró historia clínica' };
       }
 
-      // Actualizar en PostgreSQL
-      const success = await historiaClinicaPostgresService.upsert({
-        _id: payload.historiaId,
-        // Datos base del paciente (no cambian)
-        numeroId: historiaBase.numeroId,
-        primerNombre: historiaBase.primerNombre,
-        segundoNombre: historiaBase.segundoNombre,
-        primerApellido: historiaBase.primerApellido,
-        segundoApellido: historiaBase.segundoApellido,
-        celular: historiaBase.celular,
-        email: historiaBase.email,
-        codEmpresa: historiaBase.codEmpresa,
-        tipoExamen: historiaBase.tipoExamen,
-        fechaAtencion: historiaBase.fechaAtencion,
-        medico: historiaBase.medico,
-
-        // Datos médicos ingresados por el doctor (del payload)
+      // Actualizar solo los campos médicos editables (no toca empresa, motivoConsulta, etc.)
+      const success = await historiaClinicaPostgresService.updateMedicalFields(payload.historiaId, {
         mdAntecedentes: payload.mdAntecedentes,
         mdObsParaMiDocYa: payload.mdObsParaMiDocYa,
         mdObservacionesCertificado: payload.mdObservacionesCertificado,
@@ -171,10 +156,6 @@ class MedicalHistoryService {
         talla: payload.talla,
         peso: payload.peso,
         cargo: payload.cargo,
-
-        // Campos de estado
-        fechaConsulta: new Date(),
-        atendido: 'ATENDIDO',
       });
 
       if (success) {

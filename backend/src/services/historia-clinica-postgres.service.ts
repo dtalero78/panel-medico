@@ -388,6 +388,75 @@ class HistoriaClinicaPostgresService {
   }
 
   /**
+   * Actualiza únicamente los campos médicos editables por el doctor.
+   * No toca empresa, motivoConsulta, diagnostico, tratamiento, pvEstado, etc.
+   */
+  async updateMedicalFields(
+    historiaId: string,
+    fields: {
+      mdAntecedentes?: string;
+      mdObsParaMiDocYa?: string;
+      mdObservacionesCertificado?: string;
+      mdRecomendacionesMedicasAdicionales?: string;
+      mdConceptoFinal?: string;
+      mdDx1?: string;
+      mdDx2?: string;
+      talla?: string;
+      peso?: string;
+      cargo?: string;
+    }
+  ): Promise<boolean> {
+    try {
+      const query = `
+        UPDATE "HistoriaClinica"
+        SET
+          "mdAntecedentes" = $2,
+          "mdObsParaMiDocYa" = $3,
+          "mdObservacionesCertificado" = $4,
+          "mdRecomendacionesMedicasAdicionales" = $5,
+          "mdConceptoFinal" = $6,
+          "mdDx1" = $7,
+          "mdDx2" = $8,
+          "talla" = $9,
+          "peso" = $10,
+          "cargo" = $11,
+          "fechaConsulta" = NOW(),
+          "atendido" = 'ATENDIDO',
+          "_updatedDate" = NOW()
+        WHERE "_id" = $1
+        RETURNING "_id"
+      `;
+
+      const params = [
+        historiaId,
+        fields.mdAntecedentes ?? null,
+        fields.mdObsParaMiDocYa ?? null,
+        fields.mdObservacionesCertificado ?? null,
+        fields.mdRecomendacionesMedicasAdicionales ?? null,
+        fields.mdConceptoFinal ?? null,
+        fields.mdDx1 ?? null,
+        fields.mdDx2 ?? null,
+        fields.talla ?? null,
+        fields.peso ?? null,
+        fields.cargo ?? null,
+      ];
+
+      const result = await postgresService.query(query, params);
+
+      if (result && result.length > 0) {
+        console.log(`✅ [PostgreSQL] Campos médicos actualizados para ${historiaId}`);
+        return true;
+      }
+
+      console.warn(`⚠️  [PostgreSQL] No se encontró historia clínica ${historiaId} para actualizar`);
+      return false;
+    } catch (error) {
+      console.error(`❌ [PostgreSQL] Error actualizando campos médicos ${historiaId}:`, error);
+      return false;
+    }
+  }
+
+  /**
    * Actualiza el campo aprobacion de una historia clínica
    */
   async updateAprobacion(historiaId: string, aprobacion: string): Promise<boolean> {
