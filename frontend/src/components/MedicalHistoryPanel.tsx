@@ -1256,7 +1256,7 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
             {data.codEmpresa?.toUpperCase() === 'SIIGO' ? (
               <>
                 <option value="APTO">APTO</option>
-                <option value="NO APTO">NO APTO</option>
+                <option value="Presenta restricciones médico-laborales actualmente incompatibles con las exigencias del cargo evaluado.">Presenta restricciones médico-laborales actualmente incompatibles con las exigencias del cargo evaluado.</option>
                 <option value="APLAZADO">APLAZADO</option>
                 <option value="NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL">NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL</option>
               </>
@@ -1268,7 +1268,7 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
                 <option value="APTO PARA TRABAJO EN ALTURAS">APTO PARA TRABAJO EN ALTURAS</option>
                 <option value="APTO PARA TRABAJO EN ALTURAS Y ESPACIOS CONFINADOS">APTO PARA TRABAJO EN ALTURAS Y ESPACIOS CONFINADOS</option>
                 <option value="APLAZADO">APLAZADO</option>
-                <option value="NO APTO">NO APTO</option>
+                <option value="Presenta restricciones médico-laborales actualmente incompatibles con las exigencias del cargo evaluado.">Presenta restricciones médico-laborales actualmente incompatibles con las exigencias del cargo evaluado.</option>
                 <option value="NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL">NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL</option>
                 <option value="Puede realizar actividades escolares y grupales">Puede realizar actividades escolares y grupales</option>
               </>
