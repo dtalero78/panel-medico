@@ -318,13 +318,13 @@ class MedicalPanelService {
    * Busca un paciente por documento de identidad o celular
    * FUENTE: PostgreSQL (principal) → Wix (fallback)
    */
-  async searchPatientByDocument(searchTerm: string): Promise<Patient | null> {
+  async searchPatientByDocument(searchTerm: string): Promise<Patient[]> {
     try {
       // Intentar con PostgreSQL primero
-      const patient = await this.searchPatientFromPostgres(searchTerm);
-      if (patient) {
-        console.log(`🔍 [PostgreSQL] Paciente encontrado: ${searchTerm}`);
-        return patient;
+      const patients = await this.searchPatientFromPostgres(searchTerm);
+      if (patients.length > 0) {
+        console.log(`🔍 [PostgreSQL] ${patients.length} registro(s) encontrado(s): ${searchTerm}`);
+        return patients;
       }
     } catch (error) {
       console.warn('⚠️  [PostgreSQL] Error en searchPatient, usando Wix fallback:', error);
@@ -337,24 +337,26 @@ class MedicalPanelService {
   /**
    * Busca paciente en PostgreSQL
    */
-  private async searchPatientFromPostgres(searchTerm: string): Promise<Patient | null> {
+  private async searchPatientFromPostgres(searchTerm: string): Promise<Patient[]> {
+    // Devuelve TODOS los registros activos (deleted_at IS NULL) de un mismo
+    // paciente, del más reciente al más antiguo. Los sin fecha van al final.
     const result = await postgresService.query(
       `SELECT "_id", "numeroId", "primerNombre", "segundoNombre", "primerApellido", "segundoApellido",
               "celular", "fechaAtencion", "fechaConsulta", "atendido", "pvEstado",
               "codEmpresa", "empresa", "medico", "motivoConsulta", "tipoExamen"
        FROM "HistoriaClinica"
-       WHERE "numeroId" = $1 OR "celular" = $1
-       ORDER BY "fechaAtencion" DESC
-       LIMIT 1`,
+       WHERE ("numeroId" = $1 OR "celular" = $1)
+       AND deleted_at IS NULL
+       ORDER BY "fechaAtencion" DESC NULLS LAST
+       LIMIT 50`,
       [searchTerm]
     );
 
     if (!result || result.length === 0) {
-      return null;
+      return [];
     }
 
-    const row = result[0];
-    return {
+    return result.map((row: any) => ({
       _id: row._id,
       nombres: `${row.primerNombre} ${row.primerApellido}`,
       primerNombre: row.primerNombre,
@@ -371,22 +373,23 @@ class MedicalPanelService {
       medico: row.medico,
       motivoConsulta: row.motivoConsulta || '',
       tipoExamen: row.tipoExamen || ''
-    };
+    }));
   }
 
   /**
    * Fallback: Busca paciente en Wix
    */
-  private async searchPatientFromWix(searchTerm: string): Promise<Patient | null> {
+  private async searchPatientFromWix(searchTerm: string): Promise<Patient[]> {
     try {
       const response = await this.wixClient.get(`/buscarPaciente`, {
         params: { searchTerm }
       });
       console.log(`🔍 [Wix Fallback] Búsqueda completada: ${searchTerm}`);
-      return response.data.patient || null;
+      const patient = response.data.patient || null;
+      return patient ? [patient] : [];
     } catch (error) {
       console.error('❌ [Wix] Error buscando paciente:', error);
-      return null;
+      return [];
     }
   }
 
