@@ -1269,6 +1269,7 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
                 <option value="APTO PARA TRABAJO EN ALTURAS">APTO PARA TRABAJO EN ALTURAS</option>
                 <option value="APTO PARA TRABAJO EN ALTURAS Y ESPACIOS CONFINADOS">APTO PARA TRABAJO EN ALTURAS Y ESPACIOS CONFINADOS</option>
                 <option value="APTO PARA TRABAJO EN ALTURAS ESPACIOS CONFINADOS Y RIESGO ELECTRICO">APTO PARA TRABAJO EN ALTURAS ESPACIOS CONFINADOS Y RIESGO ELECTRICO</option>
+                <option value="APTO PARA CONDUCTOR">APTO PARA CONDUCTOR</option>
                 <option value="APLAZADO">APLAZADO</option>
                 <option value="Presenta restricciones médico-laborales actualmente incompatibles con las exigencias del cargo evaluado.">Presenta restricciones médico-laborales actualmente incompatibles con las exigencias del cargo evaluado.</option>
                 <option value="NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL">NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL</option>
