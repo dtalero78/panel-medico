@@ -1,5 +1,51 @@
 import historiaClinicaPostgresService from './historia-clinica-postgres.service';
 import whatsappService from './whatsapp.service';
+import postgresService from './postgres.service';
+
+// Destinatario de la alerta SST de OMEGA (WHAPI). Hoy: solo el número terminado en 2543077.
+const NOTIF_OMEGA = ['573202543077'];
+
+// Guard en memoria: crear la tabla de trazabilidad de alertas OMEGA una sola vez por proceso.
+let tablaAlertasOmegaLista = false;
+
+/** Normaliza un concepto: sin tildes, MAYÚSCULAS, espacios/saltos colapsados, sin punto final. */
+function normalizarConcepto(concepto: string): string {
+  return concepto
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
+    .replace(/\.+\s*$/, '')
+    .trim();
+}
+
+/**
+ * "Apto pleno" = APTO/ELEGIBLE del cargo SIN restricciones y SIN recomendaciones. Es el único
+ * grupo que NO requiere revisión de SST. En sync con panel-empresas.html de BSL-PLATAFORMA2 y
+ * con BSL-CONSULTAVIDEO.
+ */
+function esConceptoAptoPleno(concepto: string | null | undefined): boolean {
+  if (!concepto) return false;
+  const c = normalizarConcepto(concepto);
+  if (/\bNO\s+(APTO|ELEGIBLE)/.test(c)) return false;
+  if (c.includes('INCOMPATIBLE')) return false;
+  if (c.includes('PENDIENTE') || c.includes('APLAZADO')) return false;
+  if (c.includes('DETERIORO')) return false; // "NO PRESENTA DETERIORO..." (egreso)
+  if (c.includes('RESTRICCION') && !c.includes('SIN RESTRICCION')) return false;
+  if (c.includes('RECOMENDACION') && !c.includes('SIN RECOMENDACION')) return false;
+  return /^(APTO|APTA|ELEGIBLE)\b/.test(c);
+}
+
+/**
+ * ¿El concepto debe disparar la alerta de revisión de SST (OMEGA)? Alerta en todo lo que NO sea
+ * apto pleno (restricciones, con recomendaciones, no apto/no elegible, incompatibles,
+ * pendiente/aplazado), EXCEPTO el egreso "no presenta deterioro".
+ */
+function conceptoRequiereRevisionSst(concepto: string | null | undefined): boolean {
+  if (!concepto) return false;
+  if (esConceptoAptoPleno(concepto)) return false;
+  if (normalizarConcepto(concepto).includes('DETERIORO')) return false;
+  return true;
+}
 
 // Antecedentes personales (27 campos)
 interface AntecedentesPersonales {
@@ -178,19 +224,21 @@ class MedicalHistoryService {
   }
 
   /**
-   * Envía alerta WhatsApp cuando un paciente OMEGA tiene concepto NO APTO, APLAZADO o APTO CON RECOMENDACIONES
+   * Envía alerta WhatsApp a SST de OMEGA cuando el concepto requiere revisión (no es "apto pleno").
+   *
+   * Clasificador robusto (no whitelist exacta): la whitelist vieja ['NO APTO','APLAZADO',
+   * 'APTO CON RECOMENDACIONES'] no reconocía las redacciones "médico-laborales" del panel
+   * (ej. "Presenta restricciones médico-laborales actualmente incompatibles..."), así que la
+   * alerta había dejado de dispararse para OMEGA presencial. En sync con BSL-CONSULTAVIDEO.
    */
   private async sendOmegaAlertIfNeeded(
     historiaBase: MedicalHistoryData,
     payload: UpdateMedicalHistoryPayload
   ): Promise<void> {
     try {
-      const conceptosAlerta = ['NO APTO', 'APLAZADO', 'APTO CON RECOMENDACIONES'];
-
       if (
         historiaBase.codEmpresa?.toUpperCase() !== 'OMEGA' ||
-        !payload.mdConceptoFinal ||
-        !conceptosAlerta.includes(payload.mdConceptoFinal.toUpperCase())
+        !conceptoRequiereRevisionSst(payload.mdConceptoFinal)
       ) {
         return;
       }
@@ -224,9 +272,9 @@ class MedicalHistoryService {
       mensaje += `✅ *Aprobar:* ${approveUrl}\n`;
       mensaje += `❌ *No Aprobar:* ${rejectUrl}\n`;
 
-      const telefonos = ['573008021701', '573166939639', '573202543077'];
+      const telefonos = NOTIF_OMEGA;
 
-      console.log(`🚨 Enviando alerta OMEGA para ${nombrePaciente} - Concepto: ${payload.mdConceptoFinal}`);
+      console.log(`🚨 Enviando alerta OMEGA para ${nombrePaciente} - Concepto: ${payload.mdConceptoFinal} - tipo: ${historiaBase.tipoExamen || 'N/A'} → ${telefonos.join(', ')}`);
 
       const resultados = await Promise.allSettled(
         telefonos.map(telefono => whatsappService.sendTextMessage(telefono, mensaje))
@@ -240,9 +288,75 @@ class MedicalHistoryService {
           console.error(`❌ Error enviando alerta OMEGA a ${telefonos[i]}:`, error);
         }
       });
+
+      // Trazabilidad: registrar el envío (enviada / parcial / fallida) para poder auditar y reintentar.
+      await this.registrarAlertaOmega(historiaBase, payload, telefonos, resultados);
     } catch (error: any) {
       // No bloquear el guardado si falla el envío de alertas
       console.error('❌ Error enviando alerta OMEGA por WhatsApp:', error.message);
+    }
+  }
+
+  /**
+   * Trazabilidad de la alerta SST de OMEGA: una fila por envío con el resultado por destinatario
+   * (enviada / parcial / fallida). La tabla se crea sola la primera vez (misma tabla que usa
+   * BSL-CONSULTAVIDEO, en la BD compartida). Best-effort: nunca rompe el guardado ni el envío.
+   */
+  private async registrarAlertaOmega(
+    historiaBase: MedicalHistoryData,
+    payload: UpdateMedicalHistoryPayload,
+    telefonos: string[],
+    resultados: PromiseSettledResult<{ success: boolean; error?: string }>[]
+  ): Promise<void> {
+    try {
+      if (!tablaAlertasOmegaLista) {
+        await postgresService.query(`
+          CREATE TABLE IF NOT EXISTS omega_alertas_sst (
+            id            SERIAL PRIMARY KEY,
+            historia_id   TEXT NOT NULL,
+            numero_id     TEXT,
+            tipo_examen   TEXT,
+            concepto      TEXT,
+            destinatarios TEXT[],
+            estado        TEXT,
+            detalle       JSONB,
+            created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )
+        `);
+        // Puede que la tabla ya exista (creada por BSL-CONSULTAVIDEO) sin la columna origen.
+        await postgresService.query(`ALTER TABLE omega_alertas_sst ADD COLUMN IF NOT EXISTS origen TEXT`);
+        tablaAlertasOmegaLista = true;
+      }
+
+      const detalle = telefonos.map((tel, i) => {
+        const r = resultados[i];
+        const ok = r.status === 'fulfilled' && r.value.success;
+        const error = r.status === 'rejected'
+          ? String(r.reason)
+          : (r.value.success ? null : (r.value.error || 'error desconocido'));
+        return { telefono: tel, ok, error };
+      });
+      const enviados = detalle.filter(d => d.ok).length;
+      const estado = enviados === 0 ? 'fallida' : (enviados === telefonos.length ? 'enviada' : 'parcial');
+
+      await postgresService.query(
+        `INSERT INTO omega_alertas_sst
+           (historia_id, numero_id, tipo_examen, concepto, destinatarios, estado, detalle, origen)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)`,
+        [
+          payload.historiaId,
+          historiaBase.numeroId,
+          historiaBase.tipoExamen || null,
+          payload.mdConceptoFinal || null,
+          telefonos,
+          estado,
+          JSON.stringify(detalle),
+          'presencial',
+        ]
+      );
+      console.log(`🧾 Trazabilidad alerta OMEGA registrada: ${estado} (${enviados}/${telefonos.length})`);
+    } catch (error: any) {
+      console.error('❌ Error registrando trazabilidad de alerta OMEGA:', error.message);
     }
   }
 }
