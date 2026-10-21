@@ -5,8 +5,12 @@ import postgresService from './postgres.service';
 // Destinatario de la alerta SST de OMEGA (WHAPI). Hoy: solo el número terminado en 2543077.
 const NOTIF_OMEGA = ['573202543077'];
 
-// Guard en memoria: crear la tabla de trazabilidad de alertas OMEGA una sola vez por proceso.
+// Destinatario de la notificación de cierre de HC de SOFTSERVE (WHAPI).
+const NOTIF_SOFTSERVE = ['573148887169'];
+
+// Guard en memoria: crear las tablas de trazabilidad una sola vez por proceso.
 let tablaAlertasOmegaLista = false;
+let tablaSoftserveLista = false;
 
 /** Normaliza un concepto: sin tildes, MAYÚSCULAS, espacios/saltos colapsados, sin punto final. */
 function normalizarConcepto(concepto: string): string {
@@ -210,6 +214,9 @@ class MedicalHistoryService {
         // Enviar alerta WhatsApp para OMEGA con concepto crítico
         this.sendOmegaAlertIfNeeded(historiaBase, payload);
 
+        // Notificar a SOFTSERVE cada vez que se cierra un examen (una sola vez por orden)
+        this.sendSoftserveNotificationIfNeeded(historiaBase, payload);
+
         return { success: true };
       } else {
         return { success: false, error: 'Error al guardar en PostgreSQL' };
@@ -357,6 +364,109 @@ class MedicalHistoryService {
       console.log(`🧾 Trazabilidad alerta OMEGA registrada: ${estado} (${enviados}/${telefonos.length})`);
     } catch (error: any) {
       console.error('❌ Error registrando trazabilidad de alerta OMEGA:', error.message);
+    }
+  }
+
+  /**
+   * Notifica a SOFTSERVE cada vez que un médico cierra un examen (guarda el concepto final).
+   * Se envía UNA sola vez por orden: candado de idempotencia con PK historia_id en
+   * softserve_notificaciones (ON CONFLICT DO NOTHING). Va por WHAPI, es best-effort (nunca rompe
+   * el guardado) y se dispara en TODOS los conceptos — como ZIMMER: cada examen manda mensaje,
+   * no solo los que requieren revisión.
+   */
+  private async sendSoftserveNotificationIfNeeded(
+    historiaBase: MedicalHistoryData,
+    payload: UpdateMedicalHistoryPayload
+  ): Promise<void> {
+    try {
+      // Solo SOFTSERVE, y solo cuando el examen quedó cerrado (hay concepto final).
+      if (historiaBase.codEmpresa?.toUpperCase() !== 'SOFTSERVE' || !payload.mdConceptoFinal) {
+        return;
+      }
+
+      if (!tablaSoftserveLista) {
+        await postgresService.query(`
+          CREATE TABLE IF NOT EXISTS softserve_notificaciones (
+            historia_id   TEXT PRIMARY KEY,
+            numero_id     TEXT,
+            tipo_examen   TEXT,
+            concepto      TEXT,
+            destinatarios TEXT[],
+            estado        TEXT,
+            detalle       JSONB,
+            created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )
+        `);
+        tablaSoftserveLista = true;
+      }
+
+      // Candado: solo el primer guardado de esta orden "gana" la notificación.
+      const claim = await postgresService.query(
+        `INSERT INTO softserve_notificaciones (historia_id, numero_id, tipo_examen, concepto, destinatarios, estado)
+         VALUES ($1, $2, $3, $4, $5, 'enviando')
+         ON CONFLICT (historia_id) DO NOTHING
+         RETURNING historia_id`,
+        [
+          payload.historiaId,
+          historiaBase.numeroId,
+          historiaBase.tipoExamen || null,
+          payload.mdConceptoFinal || null,
+          NOTIF_SOFTSERVE,
+        ]
+      );
+      if (!claim || claim.length === 0) {
+        return; // esta orden ya fue notificada
+      }
+
+      const nombrePaciente = [
+        historiaBase.primerNombre,
+        historiaBase.segundoNombre,
+        historiaBase.primerApellido,
+        historiaBase.segundoApellido,
+      ].filter(Boolean).join(' ');
+
+      const certificadoUrl = `https://bsl-utilidades-yp78a.ondigitalocean.app/generar-certificado-desde-wix/${payload.historiaId}`;
+
+      let mensaje = `✅ *HISTORIA CLÍNICA CERRADA - SOFTSERVE*\n\n`;
+      mensaje += `*Paciente:* ${nombrePaciente}\n`;
+      mensaje += `*Documento:* ${historiaBase.numeroId}\n`;
+      mensaje += `*Cargo:* ${payload.cargo || historiaBase.cargo || 'No especificado'}\n`;
+      mensaje += `*Tipo de examen:* ${historiaBase.tipoExamen || 'No especificado'}\n`;
+      mensaje += `*Concepto Final:* ${payload.mdConceptoFinal}\n`;
+      mensaje += `\n*Certificado:*\n${certificadoUrl}\n`;
+
+      const telefonos = NOTIF_SOFTSERVE;
+      console.log(`📋 Notificando cierre de HC SOFTSERVE para ${nombrePaciente} → ${telefonos.join(', ')}`);
+
+      const resultados = await Promise.allSettled(
+        telefonos.map(telefono => whatsappService.sendTextMessage(telefono, mensaje))
+      );
+
+      const detalle = telefonos.map((tel, i) => {
+        const r = resultados[i];
+        const ok = r.status === 'fulfilled' && r.value.success;
+        const error = r.status === 'rejected'
+          ? String(r.reason)
+          : (r.value.success ? null : (r.value.error || 'error desconocido'));
+        if (ok) console.log(`✅ Notificación SOFTSERVE enviada a ${tel}`);
+        else console.error(`❌ Error enviando notificación SOFTSERVE a ${tel}:`, error);
+        return { telefono: tel, ok, error };
+      });
+      const enviados = detalle.filter(d => d.ok).length;
+      const estado = enviados === 0 ? 'fallida' : (enviados === telefonos.length ? 'enviada' : 'parcial');
+
+      if (estado === 'fallida') {
+        // Liberar el candado para reintentar en un próximo guardado.
+        await postgresService.query(`DELETE FROM softserve_notificaciones WHERE historia_id = $1`, [payload.historiaId]);
+      } else {
+        await postgresService.query(
+          `UPDATE softserve_notificaciones SET estado = $2, detalle = $3::jsonb WHERE historia_id = $1`,
+          [payload.historiaId, estado, JSON.stringify(detalle)]
+        );
+      }
+      console.log(`🧾 Notificación SOFTSERVE registrada: ${estado} (${enviados}/${telefonos.length})`);
+    } catch (error: any) {
+      console.error('❌ Error enviando notificación SOFTSERVE por WhatsApp:', error.message);
     }
   }
 }
